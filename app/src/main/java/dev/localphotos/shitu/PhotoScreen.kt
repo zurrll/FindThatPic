@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.text.font.FontWeight
@@ -30,7 +31,9 @@ import dev.localphotos.shitu.data.*
     var preparationIds by remember { mutableStateOf<List<Long>?>(null) }
     var photo by remember { mutableStateOf<Long?>(null) };var similar by remember { mutableStateOf<Long?>(null) }
     var clearIds by remember { mutableStateOf<List<Long>?>(null) }
+    var searchModes by remember { mutableStateOf(false) }
     var guide by rememberSaveable { mutableStateOf(vm.shouldShowGuide()) }
+    fun openPreparation() { endInput();preparationIds=null;preparation=true }
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.refreshLibrary() }
     fun requestPhotos() { permission.launch(buildList {
         if(Build.VERSION.SDK_INT>=33) { add(Manifest.permission.READ_MEDIA_IMAGES);add(Manifest.permission.POST_NOTIFICATIONS) } else add(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -39,65 +42,89 @@ import dev.localphotos.shitu.data.*
     Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
         if(state.selecting) SelectionTools(state,vm,onClear={clearIds=state.selected.toList()},onPrepare={preparationIds=state.selected.toList();preparation=true})
     }) { padding ->
-        LazyVerticalGrid(columns=GridCells.Adaptive(108.dp),modifier=Modifier.fillMaxSize().padding(padding).testTag("results"),contentPadding=PaddingValues(16.dp),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        LazyVerticalGrid(columns=GridCells.Adaptive(100.dp),modifier=Modifier.fillMaxSize().padding(padding).testTag("results"),contentPadding=PaddingValues(horizontal=12.dp,vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
             item(key="header",span={GridItemSpan(maxLineSpan)}) {
-                Row(Modifier.fillMaxWidth().height(52.dp).testTag("homeHeader"),verticalAlignment=Alignment.CenterVertically) {
-                    Surface(shape=RoundedCornerShape(12.dp),color=MaterialTheme.colorScheme.primary) { Icon(UiIcons.Image,null,tint=MaterialTheme.colorScheme.onPrimary,modifier=Modifier.padding(9.dp).size(22.dp)) }
-                    Text(androidx.compose.ui.res.stringResource(R.string.app_name),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f).padding(start=12.dp))
-                    TextButton(onClick={endInput();management=true},modifier=Modifier.testTag("librarySettings")) { Icon(UiIcons.Settings,null,Modifier.size(19.dp));Spacer(Modifier.width(6.dp));Text("设置") }
+                Row(Modifier.fillMaxWidth().heightIn(min=44.dp).testTag("homeHeader"),verticalAlignment=Alignment.CenterVertically) {
+                    Text(androidx.compose.ui.res.stringResource(R.string.app_name),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
+                    IconButton(onClick={endInput();management=true},modifier=Modifier.testTag("librarySettings")) {
+                        Icon(UiIcons.Settings,"设置",Modifier.size(20.dp))
+                    }
                 }
             }
             if(!state.allowed) item(span={GridItemSpan(maxLineSpan)}) {
                 SectionCard { Text("从图库找回图片",style=MaterialTheme.typography.headlineMedium);Text("图片在手机内处理，原图不会改变。",style=MaterialTheme.typography.bodyMedium)
                     Button(onClick={requestPhotos()},modifier=Modifier.fillMaxWidth().height(52.dp).testTag("grantPhotos")) { Text("选择可访问的照片") } }
             } else {
-                if(!state.selecting) item(key="preparation",span={GridItemSpan(maxLineSpan)}) {
-                    val ready=state.prepared.total>0 && state.prepared.complete==state.prepared.total
-                    Surface(shape=RoundedCornerShape(22.dp),color=MaterialTheme.colorScheme.primaryContainer) {
-                        Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                                Icon(if(ready) UiIcons.Check else UiIcons.Search,null,tint=MaterialTheme.colorScheme.onPrimaryContainer)
-                                Column(Modifier.weight(1f)) {
-                                    Text(if(state.discovering) "正在读取图库" else if(state.workActive) "正在补全搜索信息" else if(ready) "搜索信息已就绪" else "补全信息，找图更完整",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                                    Text(if(state.discovering) "已读取 ${state.discovered} 张" else if(state.workActive) progress.phase else "已就绪 ${state.prepared.complete} / ${state.prepared.total} 张",style=MaterialTheme.typography.bodySmall)
-                                }
-                                if(ready && !state.workActive) TextButton(onClick={preparationIds=null;preparation=true},modifier=Modifier.testTag("indexButton")) { Text("查看") }
-                            }
-                            if(state.discovering) LinearProgressIndicator(Modifier.fillMaxWidth())
-                            else if(state.workActive) LinearProgressIndicator(progress={progress.done.toFloat()/progress.target.coerceAtLeast(1)},modifier=Modifier.fillMaxWidth())
-                            if(!ready || state.workActive) Button(onClick={endInput();preparationIds=null;preparation=true},enabled=!state.discovering && !state.changingRecords,modifier=Modifier.fillMaxWidth().height(46.dp).testTag("indexButton")) { Text(if(state.workActive) "查看进度" else if(progress.paused) "继续补全信息" else "补全搜索信息") }
-                        }
-                    }
-                }
                 item(key="search",span={GridItemSpan(maxLineSpan)}) {
-                    OutlinedTextField(state.query,vm::query,modifier=Modifier.fillMaxWidth().testTag("searchField"),singleLine=true,shape=RoundedCornerShape(18.dp),
-                        leadingIcon={Icon(UiIcons.Search,null)},placeholder={Text(if(state.mode==SearchMode.TEXT) "搜索图片里的文字或内容" else "描述想找的画面")},
+                    TextField(state.query,vm::query,modifier=Modifier.fillMaxWidth().testTag("searchField"),
+                        singleLine=true,shape=RoundedCornerShape(14.dp),
+                        colors=TextFieldDefaults.colors(focusedIndicatorColor=Color.Transparent,unfocusedIndicatorColor=Color.Transparent,
+                            focusedContainerColor=MaterialTheme.colorScheme.surfaceVariant,unfocusedContainerColor=MaterialTheme.colorScheme.surfaceVariant),
+                        leadingIcon={Icon(UiIcons.Search,null,Modifier.size(20.dp))},
+                        placeholder={Text(if(state.mode==SearchMode.TEXT) "搜截图里的字或文件名" else "描述想找的画面",maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
                         keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={endInput();vm.searchNow()}),
-                        trailingIcon={if(state.query.isNotEmpty()) TextButton(onClick={vm.query("")}) { Text("清除") }})
-                }
-                if(BuildConfig.HAS_DESCRIPTION) item(key="modes",span={GridItemSpan(maxLineSpan)}) {
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                        SearchMode.entries.forEach { mode ->
-                            val selected=state.mode==mode
-                            Surface(onClick={vm.mode(mode)},shape=RoundedCornerShape(14.dp),color=if(selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,modifier=Modifier.weight(1f).testTag("searchMode${mode.name}")) {
-                                Row(Modifier.padding(12.dp),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically) { Icon(if(mode==SearchMode.TEXT) UiIcons.Text else UiIcons.Image,null,Modifier.size(19.dp));Spacer(Modifier.width(8.dp));Text(if(mode==SearchMode.TEXT) "文字搜索" else "描述找图",style=MaterialTheme.typography.labelLarge) }
+                        trailingIcon={
+                            Row(verticalAlignment=Alignment.CenterVertically) {
+                                if(state.query.isNotEmpty()) IconButton(onClick={vm.query("")},modifier=Modifier.testTag("clearQuery")) { Icon(UiIcons.Close,"清除搜索",Modifier.size(18.dp)) }
+                                if(BuildConfig.HAS_DESCRIPTION) Box {
+                                    TextButton(onClick={endInput();searchModes=true},modifier=Modifier.testTag("searchModeMenu")) {
+                                        Text(if(state.mode==SearchMode.TEXT) "文字" else "画面")
+                                        Icon(UiIcons.Down,"切换搜索方式",Modifier.size(16.dp))
+                                    }
+                                    DropdownMenu(searchModes,onDismissRequest={searchModes=false}) {
+                                        SearchMode.entries.forEach { mode ->
+                                            DropdownMenuItem(text={Text(if(mode==SearchMode.TEXT) "文字搜索" else "描述画面")},
+                                                onClick={searchModes=false;vm.mode(mode)},modifier=Modifier.testTag("searchMode${mode.name}"))
+                                        }
+                                    }
+                                }
                             }
-                        }
-                    }
+                        })
                 }
                 item(key="filters",span={GridItemSpan(maxLineSpan)}) {
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                        TextButton(onClick={endInput();sources=true},modifier=Modifier.testTag("folderButton")) { Text(when { state.options.folders.isNotEmpty()->"目录 · ${state.options.folders.size}";state.options.source!=null->state.options.source!!.label;else->"全部目录" }) }
-                        TextButton(onClick={endInput();filters=true},modifier=Modifier.testTag("filterButton")) { Text(if(state.options.hasMetadataFilters || state.filter!=PhotoFilter.ALL || (state.mode==SearchMode.TEXT && state.options.originalOnly)) "筛选 · 已选" else "筛选") }
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        TextButton(onClick={endInput();sources=true},modifier=Modifier.testTag("folderButton")) {
+                            Text(when { state.options.folders.isNotEmpty()->"目录 · ${state.options.folders.size}";state.options.source!=null->state.options.source!!.label;else->"全部目录" })
+                            Icon(UiIcons.Down,null,Modifier.size(16.dp))
+                        }
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick={endInput();vm.selecting(!state.selecting)},modifier=Modifier.testTag("selectMode")) { Text(if(state.selecting) "取消选择" else "多选") }
+                        val filtered=state.options.hasMetadataFilters || state.filter!=PhotoFilter.ALL || (state.mode==SearchMode.TEXT && state.options.originalOnly)
+                        IconButton(onClick={endInput();filters=true},modifier=Modifier.testTag("filterButton")) {
+                            Icon(UiIcons.Filter,if(filtered) "筛选 · 已选" else "筛选",Modifier.size(20.dp),
+                                tint=if(filtered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        }
+                        IconButton(onClick={endInput();vm.selecting(!state.selecting)},modifier=Modifier.testTag("selectMode")) {
+                            Icon(if(state.selecting) UiIcons.Close else UiIcons.Select,if(state.selecting) "取消选择" else "多选",Modifier.size(20.dp))
+                        }
+                    }
+                }
+                val pending=(state.prepared.total-state.prepared.complete).coerceAtLeast(0)
+                if(!state.selecting && (state.discovering || state.workActive || progress.paused || pending>0 || state.prepared.ocrFailed+state.prepared.similarFailed+state.prepared.descriptionFailed>0)) {
+                    item(key="preparation",span={GridItemSpan(maxLineSpan)}) {
+                        Column {
+                            Row(Modifier.fillMaxWidth().padding(start=8.dp),verticalAlignment=Alignment.CenterVertically) {
+                                val label=when {
+                                    state.discovering->"正在读取图库"
+                                    state.workActive->progress.phase
+                                    pending>0->"$pending 张待补全"
+                                    else->"查看准备记录"
+                                }
+                                Text(label,modifier=Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,
+                                    overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                if(!state.discovering) TextButton(onClick=::openPreparation,enabled=!state.changingRecords,modifier=Modifier.testTag("indexButton")) {
+                                    Text(if(state.workActive) "查看进度" else if(progress.paused) "继续补全" else "补全信息")
+                                }
+                            }
+                            if(state.workActive && progress.target>0) LinearProgressIndicator(progress={progress.done.toFloat()/progress.target},modifier=Modifier.fillMaxWidth().height(2.dp))
+                            else HorizontalDivider()
+                        }
                     }
                 }
                 item(key="galleryTitle",span={GridItemSpan(maxLineSpan)}) {
-                    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth()) {
-                        Text(if(state.query.isBlank()) "我的图库" else "搜索结果 · ${state.hits.size}${if(state.hits.size==100) "+" else ""}",style=MaterialTheme.typography.titleSmall,modifier=Modifier.weight(1f))
+                    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth().padding(horizontal=4.dp,vertical=6.dp)) {
+                        Text(if(state.query.isBlank()) "最近" else "${state.hits.size}${if(state.hits.size==100) "+" else ""} 个结果",
+                            style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.weight(1f))
                         if(state.searching) CircularProgressIndicator(Modifier.size(14.dp),strokeWidth=2.dp)
-                        if(state.stats.marked>0 || state.options.markedOnly) TextButton(onClick={vm.options(state.options.copy(markedOnly=!state.options.markedOnly))},modifier=Modifier.testTag("markedShortcut")) { Icon(UiIcons.Star,null,Modifier.size(15.dp));Spacer(Modifier.width(4.dp));Text(if(state.options.markedOnly) "查看全部" else "已标记") }
                     }
                 }
                 if(state.message.isNotBlank()) item(span={GridItemSpan(maxLineSpan)}) { Text(state.message,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
@@ -117,7 +144,8 @@ import dev.localphotos.shitu.data.*
     if(sources) SourceSheet(state,vm,{sources=false})
     if(filters) FilterSheet(state,vm,{filters=false})
     if(preparation) PreparationSheet(vm,{preparation=false},ids=preparationIds)
-    if(management) LibrarySheet(state,vm,{management=false},{requestPhotos()},{management=false;guide=true})
+    if(management) LibrarySheet(state,vm,{management=false},{requestPhotos()},{management=false;guide=true},
+        onPrepare={management=false;openPreparation()})
     photo?.let { id ->PhotoInspector(vm,id,{photo=null},onSimilar={photo=null;similar=it}) }
     similar?.let { id ->SimilarPhotos(vm,id,{similar=null}) }
     clearIds?.let { ids ->ClearRecordsDialog(vm,ids,{clearIds=null}) }
@@ -134,13 +162,11 @@ import dev.localphotos.shitu.data.*
                 TextButton(onClick={vm.selecting(false)},modifier=Modifier.testTag("finishSelection")) { Text("完成") }
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                Button(onClick={vm.mark(state.selected.toList(),true)},enabled=state.selected.isNotEmpty(),modifier=Modifier.weight(1f).testTag("markSelected")) { Text("标记") }
+                TextButton(onClick=onPrepare,enabled=state.selected.isNotEmpty() && !state.workActive,modifier=Modifier.weight(1f).testTag("prepareSelected")) { Text("补全所选") }
                 Box {
                     TextButton(onClick={more=true},modifier=Modifier.testTag("selectionMore")) { Text("更多") }
                     DropdownMenu(more,onDismissRequest={more=false}) {
                         DropdownMenuItem(text={Text(if(state.selected.isEmpty()) "连续选择 500 张" else "再选 500 张")},onClick={more=false;vm.selectBatch()},enabled=!state.selectingBatch,modifier=Modifier.testTag("selectBatch"))
-                        DropdownMenuItem(text={Text("补全所选图片的信息")},onClick={more=false;onPrepare()},enabled=state.selected.isNotEmpty() && !state.workActive,modifier=Modifier.testTag("prepareSelected"))
-                        DropdownMenuItem(text={Text("取消标记")},onClick={more=false;vm.mark(state.selected.toList(),false)},enabled=state.selected.isNotEmpty(),modifier=Modifier.testTag("unmarkSelected"))
                         DropdownMenuItem(text={Text("重新识别文字")},onClick={more=false;vm.rerun(state.selected.toList())},enabled=state.selected.isNotEmpty() && state.selected.size<=PhotoLimits.OCR_BATCH && !state.workActive && !state.changingRecords,modifier=Modifier.testTag("rerunSelected"))
                         DropdownMenuItem(text={Text("清除文字识别记录")},onClick={more=false;onClear()},enabled=state.selected.isNotEmpty() && !state.changingRecords,modifier=Modifier.testTag("clearSelectedRecords"))
                     }

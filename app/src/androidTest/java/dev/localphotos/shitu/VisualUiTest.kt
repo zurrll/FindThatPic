@@ -53,7 +53,7 @@ class VisualUiTest {
                 compose.waitUntil(15_000) { !vm.state.value.searching && vm.state.value.hits.isNotEmpty() }
                 click("photo_${seed.id}");click("findSimilar")
                 compose.waitUntil(15_000) { app.database.visual(seed.id)!=null }
-                click("visualCurrentScope")
+                click("visualScopeMenu");click("visualCurrentScope")
                 click("prepareFromSimilar")
                 scenario.onActivity { vm.kinds(dev.localphotos.shitu.data.PreparationKinds(text=false,similar=true,description=false));vm.limit(500) }
                 val previousToken=app.preparation.readJob()?.optString("token")
@@ -67,7 +67,7 @@ class VisualUiTest {
                 compose.waitUntil(20_000) { vm.state.value.workActive && app.progress.value.running && app.progress.value.done>=2 && compose.onAllNodesWithTag("preparePause").fetchSemanticsNodes().isNotEmpty() }
                 // Continuous progress used to cancel/debounce every search until the whole batch ended.
                 compose.onNodeWithTag("sheetDone").performClick()
-                compose.waitUntil(10_000) { compose.onAllNodesWithText("40 张相近候选").fetchSemanticsNodes().isNotEmpty() }
+                compose.waitUntil(10_000) { compose.onAllNodesWithText("40 张").fetchSemanticsNodes().isNotEmpty() }
                 assertTrue("results should be available before indexing finishes",vm.state.value.workActive)
                 click("prepareFromSimilar")
                 click("preparePause")
@@ -79,7 +79,7 @@ class VisualUiTest {
                 assertEquals(ids,app.preparation.readJob()!!.getJSONArray("ids").toString())
                 compose.onNodeWithTag("sheetDone").performClick()
                 compose.waitUntil(15_000) { app.database.visualStats(SearchOptions(folders=setOf(folder))).ready==120 }
-                compose.waitUntil(10_000) { compose.onAllNodesWithText("40 张相近候选").fetchSemanticsNodes().isNotEmpty() }
+                compose.waitUntil(10_000) { compose.onAllNodesWithText("40 张").fetchSemanticsNodes().isNotEmpty() }
                 assertTrue(app.database.recent(folder,0,200).all { it.state=="pending" }) // never ran OCR
                 val hits=app.visualSearch.find(seed.id,SearchOptions(folders=setOf(folder)))
                 assertFalse(hits.any { it.photo.id==seed.id })
@@ -90,11 +90,11 @@ class VisualUiTest {
                 compose.waitUntil(10_000) { runCatching {
                     compose.onNodeWithTag("similarResults").performScrollToNode(hasTestTag("photo_${hits.first().photo.id}"))
                 }.isSuccess }
-                click("photo_${hits.first().photo.id}");click("markOne")
-                compose.waitUntil(5000) { app.database.get(hits.first().photo.id)!!.marked }
-                click("closeInspector");click("similarSelect");click("photo_${hits.first().photo.id}")
-                compose.onNodeWithTag("similarMark").assertIsEnabled()
-                compose.onNodeWithTag("similarExport").assertDoesNotExist()
+                click("photo_${hits.first().photo.id}")
+                compose.onNodeWithTag("shareImage").assertIsDisplayed()
+                compose.onNodeWithTag("findSimilar").assertIsDisplayed()
+                click("closeInspector")
+                compose.onNodeWithTag("similarSelect").assertDoesNotExist()
                 click("closeSimilar")
             }
         } finally {

@@ -48,16 +48,13 @@ class SimilarRefreshUiTest {
                 lateinit var vm:PhotoViewModel
                 scenario.onActivity { vm=ViewModelProvider(it)[PhotoViewModel::class.java];vm.options(SearchOptions(folders=setOf(folder))) }
                 compose.waitUntil(15_000) { !vm.state.value.searching && vm.state.value.hits.size==3 }
-                click("photo_${seed.id}");click("findSimilar");click("visualCurrentScope")
+                click("photo_${seed.id}");click("findSimilar");click("visualScopeMenu");click("visualCurrentScope")
                 compose.waitUntil(10_000) { compose.onAllNodes(result(old.id)).fetchSemanticsNodes().isNotEmpty() }
                 assertTrue(compose.onAllNodes(result(replacement.id)).fetchSemanticsNodes().isEmpty())
                 val before=app.database.visualStats()
                 app.database.saveVisual(old,feature(1),1);app.database.saveVisual(replacement,feature(0),1)
                 assertEquals(before,app.database.visualStats())
                 compose.waitUntil(10_000) { compose.onAllNodes(result(replacement.id)).fetchSemanticsNodes().isNotEmpty() && compose.onAllNodes(result(old.id)).fetchSemanticsNodes().isEmpty() }
-                // There is no progress update or work-state change here to force a page refresh.
-                app.database.mark(listOf(replacement.id),true)
-                compose.waitUntil(10_000) { compose.onAllNodes(result(replacement.id) and hasContentDescription("已标记")).fetchSemanticsNodes().isNotEmpty() }
                 app.database.setFolderExcluded(folder,true)
                 compose.waitUntil(10_000) { compose.onAllNodes(result(replacement.id)).fetchSemanticsNodes().isEmpty() }
                 app.database.setFolderExcluded(folder,false)

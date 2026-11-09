@@ -48,18 +48,15 @@ private object Thumbnails {
     else Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant),contentAlignment=Alignment.Center) { Text("图片",fontSize=12.sp) }
     }
 }
-@Composable internal fun PhotoCard(hit:Hit,selecting:Boolean,selected:Boolean,onClick:()->Unit,onLongClick:(()->Unit)?=null) {
-    Column(Modifier.testTag("photo_${hit.photo.id}").clip(RoundedCornerShape(14.dp)).combinedClickable(onClick=onClick,onLongClick=onLongClick)) {
+@Composable internal fun PhotoCard(hit:Hit,selecting:Boolean,selected:Boolean,onClick:()->Unit,onLongClick:(()->Unit)?=null,showSnippet:Boolean=true) {
+    Column(Modifier.testTag("photo_${hit.photo.id}").clip(RoundedCornerShape(4.dp)).combinedClickable(onClick=onClick,onLongClick=onLongClick)) {
         Box {
             PhotoImage(hit.photo,Modifier.fillMaxWidth().aspectRatio(1f))
-            if(hit.photo.marked) Surface(modifier=Modifier.align(Alignment.TopStart).padding(6.dp),shape=RoundedCornerShape(8.dp),color=MaterialTheme.colorScheme.primaryContainer) {
-                Icon(UiIcons.Star,"已标记",modifier=Modifier.padding(5.dp).size(14.dp),tint=MaterialTheme.colorScheme.onPrimaryContainer)
-            }
             if(selecting) Checkbox(selected,{onClick()},modifier=Modifier.align(Alignment.TopEnd))
         }
-        if(hit.reason.isNotBlank()) Column(Modifier.padding(horizontal=6.dp,vertical=6.dp),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-            if(hit.snippet.isNotBlank() && hit.snippet!=hit.photo.name) Text(hit.snippet,fontSize=12.sp,lineHeight=17.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
-            Text(hit.reason,fontSize=11.sp,color=MaterialTheme.colorScheme.primary,maxLines=1)
+        if(showSnippet && hit.reason.isNotBlank() && hit.snippet.isNotBlank() && hit.snippet!=hit.photo.name) {
+            Text(hit.snippet,Modifier.padding(horizontal=4.dp,vertical=4.dp),style=MaterialTheme.typography.bodySmall,
+                color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
         }
     }
 }

@@ -198,13 +198,6 @@ class PhotoViewModel(application:Application):AndroidViewModel(application) {
         }
     }
     fun limit(value:Int) { mutable.value=mutable.value.copy(limit=value);prefs.edit().putInt("limit",value).apply() }
-    fun mark(ids:List<Long>,value:Boolean)=viewModelScope.launch {
-        withContext(Dispatchers.IO) { app.database.mark(ids,value) }
-        val selected=ids.toSet()
-        mutable.update { it.copy(hits=it.hits.map { hit ->if(hit.photo.id in selected) hit.copy(photo=hit.photo.copy(marked=value)) else hit }) }
-        refreshStats()
-        if(mutable.value.options.markedOnly) queries.value++
-    }
     fun exclude(path:String,value:Boolean)=viewModelScope.launch {
         try {
             withContext(Dispatchers.IO) { app.database.setFolderExcluded(path,value);app.library.invalidateScan() }

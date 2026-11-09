@@ -38,6 +38,12 @@ internal object UiIcons {
     val Folder=icon("Folder","M3 7 Q3 5 5 5 L10 5 L12 8 L19 8 Q21 8 21 10 L21 18 Q21 20 19 20 L5 20 Q3 20 3 18 Z")
     val Check=icon("Check","M5 12 L10 17 L20 7")
     val More=icon("More","M5 12 L5.01 12 M12 12 L12.01 12 M19 12 L19.01 12")
+    val Down=icon("Down","M6 9 L12 15 L18 9")
+    val Close=icon("Close","M6 6 L18 18 M18 6 L6 18")
+    val External=icon("External","M14 4 L20 4 L20 10 M20 4 L11 13 M20 13 L20 19 Q20 20 19 20 L5 20 Q4 20 4 19 L4 5 Q4 4 5 4 L11 4")
+    val Share=icon("Share","M15 8 A3 3 0 1 0 15 2 A3 3 0 1 0 15 8 M5 15 A3 3 0 1 0 5 9 A3 3 0 1 0 5 15 M15 22 A3 3 0 1 0 15 16 A3 3 0 1 0 15 22 M8 10.5 L12 6.5 M8 13.5 L12 17.5")
+    val Filter=icon("Filter","M3 5 L21 5 L14 13 L14 19 L10 21 L10 13 Z")
+    val Select=icon("Select","M3 6 L5 8 L8 4 M3 13 L5 15 L8 11 M11 6 L21 6 M11 13 L21 13 M11 20 L21 20")
     val Chevron=icon("Chevron","M9 6 L15 12 L9 18")
 }
 

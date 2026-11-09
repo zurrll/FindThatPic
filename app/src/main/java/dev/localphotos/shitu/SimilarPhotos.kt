@@ -7,7 +7,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -22,7 +23,6 @@ private class SimilarPage(val id:Long) {
     var seed by mutableStateOf<Photo?>(null);var hits by mutableStateOf(emptyList<Hit>())
     var scope:SearchOptions?=null;var revision=-1L
     var stats by mutableStateOf(VisualStats())
-    var selecting by mutableStateOf(false);var selected by mutableStateOf(emptySet<Long>())
 }
 private data class SimilarSnapshot(val hits:List<Hit>,val stats:VisualStats,val revision:Long)
 @Composable internal fun SimilarPhotos(vm:PhotoViewModel,seedId:Long,onDismiss:()->Unit) {
@@ -63,49 +63,56 @@ private data class SimilarSnapshot(val hits:List<Hit>,val stats:VisualStats,val 
     }
     fun back() { if(pages.size>1) pages.removeAt(pages.lastIndex) else onDismiss() }
     fun next(id:Long) { inspected=null;val existing=pages.indexOfFirst { it.id==id };if(existing>=0) while(pages.lastIndex>existing) pages.removeAt(pages.lastIndex) else pages.add(SimilarPage(id)) }
-    fun select(id:Long) { page.selected=if(id in page.selected) page.selected-id else page.selected+id }
     FullPage({back()}) {
         Column(Modifier.fillMaxSize()) {
-            PageHeader("相近图片",{back()},tag=if(pages.size>1) "similarBack" else "closeSimilar",action={
-                if(pages.size>1) TextButton(onClick=onDismiss,modifier=Modifier.testTag("closeSimilar")) { Text("图库") }
-                TextButton(onClick={page.selecting=!page.selecting;if(!page.selecting) page.selected=emptySet()},modifier=Modifier.testTag("similarSelect")) { Text(if(page.selecting) "完成" else "多选") }
-            })
-            key(page.id) { LazyVerticalGrid(columns=GridCells.Adaptive(108.dp),state=page.scroll,modifier=Modifier.weight(1f).testTag("similarResults"),contentPadding=PaddingValues(16.dp),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                item(span={GridItemSpan(maxLineSpan)}) { SectionCard {
-                    Row(horizontalArrangement=Arrangement.spacedBy(14.dp),verticalAlignment=Alignment.CenterVertically) {
-                        page.seed?.let { PhotoImage(it,Modifier.size(64.dp),fit=true) }
-                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                            Text("以这张图继续查找",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(page.seed?.name?:"正在读取…",maxLines=2,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodyMedium,modifier=Modifier.testTag("similarSeed"))
+            Row(Modifier.fillMaxWidth().heightIn(min=44.dp).padding(end=10.dp),verticalAlignment=Alignment.CenterVertically) {
+                val nested=pages.size>1
+                IconButton(onClick=::back,modifier=Modifier.testTag(if(nested) "similarBack" else "closeSimilar")) { Icon(UiIcons.Back,"返回") }
+                Text("相近图片",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
+                if(nested) TextButton(onClick=onDismiss,modifier=Modifier.testTag("closeSimilar")) { Text("图库") }
+            }
+            key(page.id) {
+                LazyVerticalGrid(columns=GridCells.Adaptive(144.dp),state=page.scroll,modifier=Modifier.weight(1f).testTag("similarResults"),
+                    contentPadding=PaddingValues(horizontal=12.dp,vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                    item(span={GridItemSpan(maxLineSpan)}) {
+                        Column {
+                            Row(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                                page.seed?.let { PhotoImage(it,Modifier.size(width=42.dp,height=36.dp),size=120) }
+                                Text("参考图",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier=Modifier.weight(1f).testTag("similarSeed").semantics { stateDescription=page.seed?.name.orEmpty() })
+                                val scopeLabel=if(currentScope) "当前范围" else "全部图库"
+                                if(available.hasMetadataFilters) {
+                                    var expanded by remember { mutableStateOf(false) }
+                                    Box {
+                                        TextButton(onClick={expanded=true},modifier=Modifier.testTag("visualScopeMenu")) {
+                                            Text(scopeLabel);Icon(UiIcons.Down,null,Modifier.size(16.dp))
+                                        }
+                                        DropdownMenu(expanded,onDismissRequest={expanded=false}) {
+                                            DropdownMenuItem(text={Text("全部图库")},onClick={expanded=false;currentScope=false},modifier=Modifier.testTag("visualAllScope"))
+                                            DropdownMenuItem(text={Text("当前范围")},onClick={expanded=false;currentScope=true},modifier=Modifier.testTag("visualCurrentScope"))
+                                        }
+                                    }
+                                } else Text(scopeLabel,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            HorizontalDivider()
                         }
                     }
-                } }
-                if(available.hasMetadataFilters) item(span={GridItemSpan(maxLineSpan)}) {
-                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                        FilterChip(!currentScope,{currentScope=false;page.selected=emptySet()},label={Text("全部图库")},modifier=Modifier.testTag("visualAllScope"))
-                        FilterChip(currentScope,{currentScope=true;page.selected=emptySet()},label={Text("当前范围")},modifier=Modifier.testTag("visualCurrentScope"))
-                    }
-                }
-                item(span={GridItemSpan(maxLineSpan)}) {
-                    Row(verticalAlignment=Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-                            Text("${page.hits.size} 张相近候选",style=MaterialTheme.typography.titleSmall)
-                            Text("已准备 ${stats.ready} / ${stats.total} 张",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.testTag("visualCoverage"))
+                    item(span={GridItemSpan(maxLineSpan)}) {
+                        Row(Modifier.fillMaxWidth().heightIn(min=34.dp).padding(horizontal=3.dp),verticalAlignment=Alignment.CenterVertically) {
+                            Text("${page.hits.size} 张",style=MaterialTheme.typography.labelLarge,modifier=Modifier.weight(1f))
+                            if(loading) CircularProgressIndicator(Modifier.size(14.dp),strokeWidth=2.dp)
+                            else if(stats.ready<stats.total) {
+                                Text("已准备 ${stats.ready}/${stats.total}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.testTag("visualCoverage"))
+                                TextButton(onClick={preparing=true},modifier=Modifier.testTag("prepareFromSimilar")) { Text("补全信息") }
+                            }
                         }
-                        if(loading) CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)
-                        if(stats.ready<stats.total) TextButton(onClick={preparing=true},modifier=Modifier.testTag("prepareFromSimilar")) { Text("补全信息") }
                     }
-                }
-                if(failure.isNotBlank()) item(span={GridItemSpan(maxLineSpan)}) { Text(failure,color=MaterialTheme.colorScheme.error) }
-                if(!loading && page.hits.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) { Text(if(stats.ready<=1) "先补全相近图片信息。" else "当前已准备的图片中，没有合适的相近候选。",style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(vertical=28.dp)) }
-                items(page.hits,key={it.photo.id}) { hit ->PhotoCard(hit,page.selecting,hit.photo.id in page.selected,onClick={if(page.selecting) select(hit.photo.id) else inspected=hit},onLongClick={page.selecting=true;select(hit.photo.id)}) }
-            } }
-            if(page.selecting) Surface(tonalElevation=4.dp) {
-                Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment=Alignment.CenterVertically) { Text("已选 ${page.selected.size} 张",modifier=Modifier.weight(1f));TextButton(onClick={page.selected=page.hits.map { it.photo.id }.toSet()},modifier=Modifier.testTag("similarSelectAll")) { Text("选择全部候选") } }
-                    Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(onClick={vm.mark(page.selected.toList(),true)},enabled=page.selected.isNotEmpty(),modifier=Modifier.weight(1f).testTag("similarMark")) { Text("标记") }
-
+                    if(failure.isNotBlank()) item(span={GridItemSpan(maxLineSpan)}) { Text(failure,color=MaterialTheme.colorScheme.error) }
+                    if(!loading && failure.isBlank() && page.hits.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) {
+                        Text(if(stats.ready<=1) "先补全相近图片信息。" else "没有找到合适的相近图片。",style=MaterialTheme.typography.bodyMedium,modifier=Modifier.padding(vertical=20.dp))
+                    }
+                    items(page.hits,key={it.photo.id}) { hit ->
+                        PhotoCard(hit,selecting=false,selected=false,onClick={inspected=hit},showSnippet=false)
                     }
                 }
             }

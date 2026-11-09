@@ -9,7 +9,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.LruCache
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -29,7 +29,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.localphotos.shitu.data.Hit
@@ -60,7 +61,7 @@ internal data class InspectorData(val detail:PhotoDetails,val features:JSONObjec
     var more by remember(id) { mutableStateOf(false) }
     var copied by remember(id) { mutableStateOf(false) }
     val context=LocalContext.current
-    LaunchedEffect(id,state.stats.marked) {
+    LaunchedEffect(id) {
         try {
             photo=withContext(Dispatchers.IO) { vm.app.database.get(id,brief=true)?:error("图片已不可访问") }
         } catch(e:CancellationException) { throw e } catch(_:Exception) { failure="图片暂时无法读取" }
@@ -71,7 +72,7 @@ internal data class InspectorData(val detail:PhotoDetails,val features:JSONObjec
             runCatching { vm.app.database.saveMatch(id,trace.optString("query"),hit.matchDebug) }
         } }
     }
-    LaunchedEffect(id,text,technical,state.workActive,state.stats.processed,state.stats.marked) {
+    LaunchedEffect(id,text,technical,state.workActive,state.stats.processed) {
         if(!text && !technical) return@LaunchedEffect
         try {
             if(text && !technical) textPhoto=withContext(Dispatchers.IO) { vm.app.database.get(id) }
@@ -83,7 +84,7 @@ internal data class InspectorData(val detail:PhotoDetails,val features:JSONObjec
             }
         } catch(e:CancellationException) { throw e } catch(_:Exception) { failure="图片暂时无法读取" }
     }
-    FullPage(onDismiss={if(technical) technical=false else onDismiss()},color=if(technical) MaterialTheme.colorScheme.background else Color(0xFF101715)) {
+    FullPage(onDismiss={if(technical) technical=false else if(text) text=false else onDismiss()},color=if(technical) MaterialTheme.colorScheme.background else Color(0xFF101715)) {
         val loaded=data
         if(technical) {
             if(loaded!=null) TechnicalDetails(vm,loaded,onBack={technical=false})
@@ -95,22 +96,15 @@ internal data class InspectorData(val detail:PhotoDetails,val features:JSONObjec
         else MaterialTheme(colorScheme=darkColorScheme(primary=Color(0xFFB2E6D7),onPrimary=Color(0xFF00382E),background=Color(0xFF101715),surface=Color(0xFF101715))) {
             Surface(Modifier.fillMaxSize()) {
                 Column {
-                    Row(Modifier.fillMaxWidth().height(64.dp).padding(end=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                        IconButton(onClick=onDismiss,modifier=Modifier.testTag("closeInspector")) { Icon(UiIcons.Back,"返回") }
-                        Text(photo?.name?:"图片",modifier=Modifier.weight(1f),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.titleSmall)
-                        photo?.let { photo ->
-                            val marked=photo.marked
-                            TextButton(onClick={vm.mark(listOf(id),!marked)},modifier=Modifier.testTag("markOne")) {
-                                Icon(UiIcons.Star,null,Modifier.size(19.dp));Spacer(Modifier.width(5.dp));Text(if(marked) "已标记" else "标记")
-                            }
-                        }
+                    Row(Modifier.fillMaxWidth().heightIn(min=44.dp),verticalAlignment=Alignment.CenterVertically) {
+                        IconButton(onClick={if(text) text=false else onDismiss()},modifier=Modifier.testTag("closeInspector")) { Icon(UiIcons.Back,"返回") }
+                        if(text) Text("图片文字",style=MaterialTheme.typography.titleMedium)
                     }
                     Box(Modifier.weight(1f).fillMaxWidth(),contentAlignment=Alignment.Center) {
                         if(photo==null) { if(failure.isBlank()) CircularProgressIndicator() else Text(failure) }
                         else if(text) {
                             val content=textPhoto?.text
                             Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(20.dp)) {
-                                Text("图片文字",style=MaterialTheme.typography.headlineSmall)
                                 if(content==null) { if(failure.isBlank()) CircularProgressIndicator() else Text(failure) }
                                 else {
                                     SelectionContainer { Text(content.take(30000).ifBlank { if(textPhoto?.state=="pending") "这张图片还没有准备文字信息。" else "未识别到文字。" },style=MaterialTheme.typography.bodyLarge) }
@@ -119,21 +113,51 @@ internal data class InspectorData(val detail:PhotoDetails,val features:JSONObjec
                             }
                         } else photo?.let { key(it.key,it.fingerprint) { ZoomPhoto(it) } }
                     }
-                    photo?.let { Text("${dateLabel(it.added,"日期未知")}  ·  ${it.width} × ${it.height}",style=MaterialTheme.typography.bodySmall,color=Color(0xFFABC0B8),modifier=Modifier.padding(horizontal=24.dp,vertical=16.dp)) }
-                    Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically) {
-                        if(onSimilar!=null) Button(onClick={onSimilar(id)},enabled=photo!=null,modifier=Modifier.weight(1f).height(50.dp).testTag("findSimilar")) { Icon(UiIcons.Similar,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("找相近") }
-                        OutlinedButton(onClick={text=!text},enabled=photo!=null,modifier=Modifier.weight(1f).height(50.dp).testTag("viewerText")) { Text(if(text) "查看图片" else "图片文字") }
-                        Box {
-                            TextButton(onClick={more=true},modifier=Modifier.testTag("viewerMore")) { Text("更多") }
-                            DropdownMenu(more,onDismissRequest={more=false}) {
-                                DropdownMenuItem(text={Text("技术详情")},onClick={more=false;technical=true},enabled=photo!=null,modifier=Modifier.testTag("advancedInspector"))
-                                DropdownMenuItem(text={Text("用系统相册打开")},onClick={more=false;photo?.let { photo ->safeStart(context,Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(photo.uri),photo.mime.ifBlank { "image/*" }).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) }})
+                    if(!text) {
+                        HorizontalDivider(color=MaterialTheme.colorScheme.onSurface.copy(alpha=.16f))
+                        Row(Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
+                            val current=photo
+                            if(onSimilar!=null) ViewerAction("找相近",UiIcons.Similar,Modifier.weight(1f).testTag("findSimilar"),enabled=current!=null) { onSimilar(id) }
+                            ViewerAction("在相册看",UiIcons.External,Modifier.weight(1f).testTag("openInGallery"),enabled=current!=null) {
+                                current?.let {
+                                    safeStart(context,Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(it.uri),it.mime.ifBlank { "image/*" })
+                                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                                }
+                            }
+                            ViewerAction("分享",UiIcons.Share,Modifier.weight(1f).testTag("shareImage"),enabled=current!=null) {
+                                current?.let { safeStart(context,Intent.createChooser(photoShareIntent(it),null)) }
+                            }
+                            Box(Modifier.weight(1f)) {
+                                ViewerAction("更多",UiIcons.More,Modifier.fillMaxWidth().testTag("viewerMore")) { more=true }
+                                DropdownMenu(more,onDismissRequest={more=false}) {
+                                    DropdownMenuItem(text={Text("图片文字")},onClick={more=false;text=true},enabled=current!=null,modifier=Modifier.testTag("viewerText"))
+                                    DropdownMenuItem(text={Text("技术详情")},onClick={more=false;technical=true},enabled=current!=null,modifier=Modifier.testTag("advancedInspector"))
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+internal fun photoShareIntent(photo:Photo):Intent {
+    val uri=Uri.parse(photo.uri)
+    return Intent(Intent.ACTION_SEND).apply {
+        type=photo.mime.ifBlank { "image/*" }
+        putExtra(Intent.EXTRA_STREAM,uri)
+        clipData=ClipData.newRawUri("图片",uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+}
+
+@Composable private fun ViewerAction(label:String,icon:ImageVector,modifier:Modifier,enabled:Boolean=true,onClick:()->Unit) {
+    val color=MaterialTheme.colorScheme.onSurface.copy(alpha=if(enabled) 1f else .38f)
+    Column(modifier.clickable(enabled=enabled,role=Role.Button,onClick=onClick).heightIn(min=52.dp).padding(vertical=4.dp),
+        horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(3.dp,Alignment.CenterVertically)) {
+        Icon(icon,null,Modifier.size(20.dp),tint=color)
+        Text(label,style=MaterialTheme.typography.labelSmall,color=color,maxLines=1)
     }
 }
 
@@ -161,7 +185,7 @@ internal data class InspectorData(val detail:PhotoDetails,val features:JSONObjec
             .pointerInput(photo.id,width,height) { detectTransformGestures { _,pan,change,_ ->zoom=(zoom*change).coerceIn(1f,6f);offset=if(zoom==1f) Offset.Zero else bounded(offset+pan) } }
         val image=bitmap
         if(image!=null) Image(image.asImageBitmap(),photo.name,modifier=Modifier.fillMaxSize().then(gestures).graphicsLayer { scaleX=zoom;scaleY=zoom;translationX=offset.x;translationY=offset.y },contentScale=ContentScale.Fit)
-        else if(failed) Text("无法显示图片，可在“更多”中用系统相册打开",modifier=Modifier.padding(24.dp))
+        else if(failed) Text("无法显示图片，可点「在相册看」",modifier=Modifier.padding(24.dp))
         else {
             PhotoImage(photo,Modifier.fillMaxSize(),fit=true)
             CircularProgressIndicator(Modifier.size(28.dp))

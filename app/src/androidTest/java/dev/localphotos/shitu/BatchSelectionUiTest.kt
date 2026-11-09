@@ -24,7 +24,7 @@ class BatchSelectionUiTest {
     @get:Rule val compose=createEmptyComposeRule()
     private val instrument=InstrumentationRegistry.getInstrumentation()
     private val app=instrument.targetContext.applicationContext as PhotoApp
-    @Test fun oneTapSelectsFiveHundredBeyondLoadedGridAndCanMarkMore()=runBlocking<Unit> {
+    @Test fun oneTapSelectsFiveHundredBeyondLoadedGridAndCanAddMore()=runBlocking<Unit> {
         val folder="Pictures/BatchSelection/${System.nanoTime()}/";val uris=mutableListOf<android.net.Uri>()
         val bitmap=Bitmap.createBitmap(120,80,Bitmap.Config.ARGB_8888);Canvas(bitmap).drawColor(Color.rgb(30,100,80))
         val bytes=ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }.toByteArray();bitmap.recycle()
@@ -45,7 +45,7 @@ class BatchSelectionUiTest {
                 compose.waitUntil(10000) { vm.state.value.selected.size==500 && !vm.state.value.selectingBatch }
                 assertEquals(60,vm.state.value.hits.size)
                 click("selectionMore");click("selectBatch");compose.waitUntil(10000) { vm.state.value.selected.size==502 }
-                click("markSelected");compose.waitUntil(10000) { app.database.recent(folder,0,600).all { it.marked } }
+                compose.onNodeWithTag("prepareSelected").assertIsEnabled()
                 val shot=instrument.uiAutomation.takeScreenshot();File(app.getExternalFilesDir(null),"batch-selection-500.png").outputStream().use { shot.compress(Bitmap.CompressFormat.PNG,100,it) };shot.recycle()
                 compose.onNodeWithTag("exportSelected").assertDoesNotExist()
             }

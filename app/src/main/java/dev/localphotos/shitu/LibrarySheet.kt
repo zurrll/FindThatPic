@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
-@Composable internal fun LibrarySheet(state:UiState,vm:PhotoViewModel,onDismiss:()->Unit,onPermission:()->Unit,onGuide:()->Unit) {
+@Composable internal fun LibrarySheet(state:UiState,vm:PhotoViewModel,onDismiss:()->Unit,onPermission:()->Unit,onGuide:()->Unit,onPrepare:()->Unit) {
     val scope=rememberCoroutineScope();val context=LocalContext.current
     var exclusions by remember { mutableStateOf(false) };var clear by remember { mutableStateOf(false) }
     var report by remember { mutableStateOf<String?>(null) };var about by remember { mutableStateOf(false) }
@@ -25,6 +25,7 @@ import java.io.File
         Column(Modifier.fillMaxSize()) {
             PageHeader("图库设置",onDismiss,tag="closeSettings")
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                SettingRow("补全搜索信息",onClick=onPrepare,modifier=Modifier.testTag("settingsPrepare"),icon=UiIcons.Check)
                 SettingRow("排除目录",if(state.excluded.isEmpty()) "选择不想在拾图中看到的文件夹" else "已排除 ${state.excluded.size} 个目录",{exclusions=true},Modifier.testTag("manageExclusions"),UiIcons.Folder)
                 SettingRow("照片访问权限",state.access,onPermission,icon=UiIcons.Image)
                 SettingRow("刷新图库",if(state.discovering) "正在读取…" else "检查新增、移动或删除的图片",{if(!state.discovering) vm.refreshLibrary()},icon=UiIcons.Similar)

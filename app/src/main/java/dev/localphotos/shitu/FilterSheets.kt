@@ -87,7 +87,6 @@ import java.time.ZoneId
                 }
                 Label("结果排序")
                 Choices { ResultOrder.entries.forEach { order ->FilterChip(options.order==order,{vm.options(options.copy(order=order))},label={Text(when(order) { ResultOrder.RELEVANCE->"相关度";ResultOrder.NEWEST->"最新在前";ResultOrder.OLDEST->"最早在前" })}) } }
-                Toggle("只看已标记",options.markedOnly,{vm.options(options.copy(markedOnly=it))},"markedOnly")
                 SettingRow(if(more) "收起更多条件" else "更多条件","格式、长图和文字匹配",{more=!more},Modifier.testTag("moreFilters"))
             }
             if(more) item {

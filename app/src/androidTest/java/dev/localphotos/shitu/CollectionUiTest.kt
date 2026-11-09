@@ -37,7 +37,7 @@ class CollectionUiTest {
         val image=instrument.uiAutomation.takeScreenshot()
         File(app.getExternalFilesDir(null),name).outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) };image.recycle()
     }
-    @Test fun batchMarkClearAndExcludeAreUsable()=runBlocking {
+    @Test fun batchClearAndExcludePreserveLegacyData()=runBlocking {
         val folder="Pictures/CollectionUi/${System.nanoTime()}/"
         val uris=mutableListOf<android.net.Uri>()
         val image=Bitmap.createBitmap(700,500,Bitmap.Config.ARGB_8888)
@@ -57,6 +57,7 @@ class CollectionUiTest {
             image.recycle();app.library.discover()
             val ids=app.database.recent(folder,0,10).map { it.id }
             ids.forEach { app.database.complete(it,"searchable sample","[]",1) }
+            app.database.mark(ids,true)
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 lateinit var vm:PhotoViewModel
                 scenario.onActivity { vm=ViewModelProvider(it)[PhotoViewModel::class.java];vm.options(SearchOptions(folders=setOf(folder))) }
@@ -80,10 +81,20 @@ class CollectionUiTest {
                 assertFalse(vm.state.value.discovering);assertEquals(before,seen())
                 app.database.saveFeedback(ids.first(),"旧版保存的说明","", "{}")
                 click("photo_${ids.first()}");compose.onNodeWithTag("reviewNote").assertDoesNotExist()
-                click("markOne");compose.waitUntil(5000) { app.database.get(ids.first())!!.marked }
+                compose.onNodeWithTag("markOne").assertDoesNotExist()
+                compose.onNodeWithTag("openInGallery").assertIsDisplayed()
+                compose.onNodeWithTag("shareImage").assertIsDisplayed()
+                val photo=app.database.get(ids.first())!!
+                val share=photoShareIntent(photo)
+                assertEquals(android.content.Intent.ACTION_SEND,share.action)
+                assertEquals("image/png",share.type)
+                assertEquals(photo.uri,share.clipData!!.getItemAt(0).uri.toString())
+                assertEquals(1,share.clipData!!.itemCount)
+                assertTrue(share.flags and android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION!=0)
+                assertTrue(share.flags and android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION==0)
                 shot("collection-viewer.png");click("closeInspector")
-                click("selectMode");click("selectVisible");click("markSelected")
-                compose.waitUntil(5000) { ids.all { app.database.get(it)!!.marked } }
+                click("selectMode");click("selectVisible")
+                compose.onNodeWithTag("prepareSelected").assertIsEnabled()
                 compose.onNodeWithTag("exportSelected").assertDoesNotExist()
                 shot("collection-batch.png")
                 click("selectionMore");click("clearSelectedRecords")
@@ -98,9 +109,7 @@ class CollectionUiTest {
                 shot("collection-exclusions.png");click("exclude_$folder")
                 compose.waitUntil(10_000) { folder !in vm.state.value.excluded && vm.state.value.hits.size==2 }
                 click("sheetDone");click("closeSettings")
-                click("markedShortcut")
-                compose.waitUntil(5000) { vm.state.value.options.markedOnly && vm.state.value.hits.size==2 }
-                shot("collection-marked.png")
+                compose.onNodeWithTag("markedShortcut").assertDoesNotExist()
             }
         } finally {
             if(!image.isRecycled) image.recycle()
