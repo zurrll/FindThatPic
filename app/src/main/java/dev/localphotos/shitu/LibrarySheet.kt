@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
-@Composable internal fun LibrarySheet(state:UiState,vm:PhotoViewModel,onDismiss:()->Unit,onPermission:()->Unit) {
+@Composable internal fun LibrarySheet(state:UiState,vm:PhotoViewModel,onDismiss:()->Unit,onPermission:()->Unit,onGuide:()->Unit) {
     val scope=rememberCoroutineScope();val context=LocalContext.current
     var exclusions by remember { mutableStateOf(false) };var clear by remember { mutableStateOf(false) }
     var report by remember { mutableStateOf<String?>(null) };var about by remember { mutableStateOf(false) }
@@ -35,13 +35,14 @@ import java.io.File
                         SettingRow("性能报告","查看本机处理耗时与内存记录",{scope.launch { report=withContext(Dispatchers.IO) { vm.app.metrics.report() } }},Modifier.testTag("performanceReport"),UiIcons.Info)
                     }
                 }
+                SettingRow("操作指引","补全信息、搜索和找相近",onGuide,Modifier.testTag("openGuide"),UiIcons.Search)
                 SettingRow("关于拾图","${BuildConfig.VERSION_NAME} · ${context.getString(R.string.edition_name)}",{about=true},icon=UiIcons.Info)
             }
         }
     }
     if(exclusions) ExcludedFolderSheet(state,vm,{exclusions=false})
     if(clear) ClearRecordsDialog(vm,onDismiss={clear=false})
-    if(about) AlertDialog(onDismissRequest={about=false},title={Text("${context.getString(R.string.app_name)} ${BuildConfig.VERSION_NAME}")},text={Text("构建 ${BuildConfig.VERSION_CODE}\n\n图片和搜索记录保存在手机内，无联网权限。原图只读；测试包仅在主动打包时生成。")},confirmButton={TextButton(onClick={about=false}) { Text("关闭") }})
+    if(about) AlertDialog(onDismissRequest={about=false},title={Text("${context.getString(R.string.app_name)} ${BuildConfig.VERSION_NAME}")},text={Text("构建 ${BuildConfig.VERSION_CODE}\n\n图片和搜索记录保存在手机内，无联网权限。原图只读。")},confirmButton={TextButton(onClick={about=false}) { Text("关闭") }})
     report?.let { value ->FullPage({report=null}) {
         val data=remember(value) { JSONObject(value) }
         Column(Modifier.fillMaxSize()) {

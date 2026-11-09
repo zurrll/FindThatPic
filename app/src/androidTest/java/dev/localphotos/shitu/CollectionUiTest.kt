@@ -15,13 +15,11 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import dev.localphotos.shitu.data.SearchOptions
 import kotlinx.coroutines.runBlocking
-import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import java.util.zip.ZipFile
 
 @RunWith(AndroidJUnit4::class)
 class CollectionUiTest {
@@ -39,7 +37,7 @@ class CollectionUiTest {
         val image=instrument.uiAutomation.takeScreenshot()
         File(app.getExternalFilesDir(null),name).outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) };image.recycle()
     }
-    @Test fun oneFieldFeedbackMarksBatchExportAndClearAndExcludeAreUsable()=runBlocking {
+    @Test fun batchMarkClearAndExcludeAreUsable()=runBlocking {
         val folder="Pictures/CollectionUi/${System.nanoTime()}/"
         val uris=mutableListOf<android.net.Uri>()
         val image=Bitmap.createBitmap(700,500,Bitmap.Config.ARGB_8888)
@@ -86,21 +84,8 @@ class CollectionUiTest {
                 shot("collection-viewer.png");click("closeInspector")
                 click("selectMode");click("selectVisible");click("markSelected")
                 compose.waitUntil(5000) { ids.all { app.database.get(it)!!.marked } }
-                click("exportSelected")
-                compose.onNodeWithText("这批样本的整体说明").assertDoesNotExist()
-                compose.onNodeWithTag("exportNote").performTextReplacement("这批图片的小字有漏识别")
-                click("generateSamples")
-                compose.waitUntil(20_000) { compose.onAllNodesWithText("分享 ZIP").fetchSemanticsNodes().isNotEmpty() }
-                val file=File(app.cacheDir,"samples").listFiles()!!.filter { it.extension=="zip" }.maxBy { it.lastModified() }
-                ZipFile(file).use { zip ->
-                    val manifest=JSONObject(zip.getInputStream(zip.getEntry("manifest.json")).bufferedReader().readText())
-                    assertTrue(manifest.getBoolean("includeImages"));assertTrue(manifest.getBoolean("includeSourcePaths"))
-                    assertEquals(2,manifest.getInt("copiedImages"))
-                    val rows=manifest.getJSONArray("samples")
-                    for(i in 0 until rows.length()) assertTrue(rows.getJSONObject(i).getBoolean("marked"))
-                    assertTrue(zip.entries().asSequence().filter { it.name.endsWith("review.json") }.any { zip.getInputStream(it).bufferedReader().readText().contains("旧版") })
-                }
-                click("closeExport");shot("collection-batch.png")
+                compose.onNodeWithTag("exportSelected").assertDoesNotExist()
+                shot("collection-batch.png")
                 click("selectionMore");click("clearSelectedRecords")
                 compose.waitUntil(5000) { compose.onAllNodesWithText("清除 2 张").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithTag("confirmClearRecords").assertIsEnabled().performClick()

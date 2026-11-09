@@ -91,6 +91,15 @@ class PhotoViewModel(application:Application):AndroidViewModel(application) {
             }
         }
     }
+    @Suppress("DEPRECATION")
+    fun shouldShowGuide(): Boolean {
+        if (prefs.getBoolean("guide_seen", false) || app.library.hasAccess()) return false
+        val installed = app.packageManager.getPackageInfo(app.packageName, 0)
+        return installed.firstInstallTime == installed.lastUpdateTime
+    }
+
+    fun finishGuide() { prefs.edit().putBoolean("guide_seen", true).apply() }
+
     fun onResume()=refreshLibrary(force=false,quiet=true)
     fun refreshLibrary(force:Boolean=true,quiet:Boolean=false) {
         if(discovery?.isActive==true) { refreshAgain=true;return }

@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHelper(context, name, null, 9) {
+class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHelper(context, name, null, 10) {
     private val visualRevision=MutableStateFlow(0L)
     /** A count cannot detect replacements or a changed search scope. Publish after successful writes. */
     val visualChanges=visualRevision.asStateFlow()
@@ -29,7 +29,7 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
             available INTEGER NOT NULL DEFAULT 1, state TEXT NOT NULL DEFAULT 'pending',
             ocr_text TEXT NOT NULL DEFAULT '', blocks TEXT NOT NULL DEFAULT '[]',
             error TEXT NOT NULL DEFAULT '', attempts INTEGER NOT NULL DEFAULT 0,
-            ocr_ms INTEGER NOT NULL DEFAULT 0, semantic INTEGER NOT NULL DEFAULT 0)""")
+            ocr_ms INTEGER NOT NULL DEFAULT 0, semantic INTEGER NOT NULL DEFAULT 0, meaning_ms INTEGER)""")
         db.execSQL("CREATE INDEX photo_scope ON photos(available, state, added DESC)")
         db.execSQL("CREATE INDEX photo_folder ON photos(folder)")
         db.execSQL("CREATE VIRTUAL TABLE photo_fts USING fts4(tokens, tokenize=unicode61)")
@@ -99,6 +99,9 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
                     })
             }
         }
+        readableDatabase.rawQuery("SELECT meaning_ms FROM photos WHERE _id=? AND semantic=1",arrayOf(id.toString())).use { c ->
+            if(c.moveToFirst() && !c.isNull(0)) result.put("meaningMs",c.getLong(0))
+        }
         val passages=org.json.JSONArray()
         readableDatabase.rawQuery("SELECT chunk,passage,length(embedding) FROM vectors WHERE photo_id=? ORDER BY chunk",arrayOf(id.toString())).use { c ->
             while(c.moveToNext()) passages.put(org.json.JSONObject().put("index",c.getInt(0)).put("text",c.getString(1)).put("dimensions",c.getInt(2)/4))
@@ -154,6 +157,7 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
         db.execSQL("CREATE INDEX photo_review ON photos(available,review_status)")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if(oldVersion<10) db.execSQL("ALTER TABLE photos ADD COLUMN meaning_ms INTEGER")
         if(oldVersion<8) addDescriptionTable(db)
         if(oldVersion<7) addVisualTable(db)
         if(oldVersion<6) addCollectionColumns(db)
@@ -315,13 +319,6 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
         }
         return ids
     }
-    fun visualExport(id:Long):org.json.JSONObject?=readableDatabase.rawQuery("SELECT fingerprint,version,embedding,phash,layout,decoded_width,decoded_height,error,elapsed_ms FROM visual_features WHERE photo_id=?",arrayOf(id.toString())).use { c ->
-        if(!c.moveToFirst()) null else org.json.JSONObject().put("formatVersion",1).put("fingerprint",c.getString(0)).put("modelVersion",c.getString(1))
-            .put("embeddingF32le",android.util.Base64.encodeToString(c.getBlob(2),android.util.Base64.NO_WRAP))
-            .put("phashHex",java.lang.Long.toUnsignedString(c.getLong(3),16))
-            .put("layoutRgb",android.util.Base64.encodeToString(c.getBlob(4),android.util.Base64.NO_WRAP))
-            .put("decodedWidth",c.getInt(5)).put("decodedHeight",c.getInt(6)).put("error",c.getString(7)).put("elapsedMs",c.getLong(8))
-    }
     fun pending(folder: String?, limit: Int, semantics: Boolean): List<Photo> {
         val (where,args)=scope(folder,0)
         val condition=if(semantics) "(state='pending' OR (state='done' AND semantic=0))" else "state='pending'"
@@ -354,14 +351,14 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
         "UPDATE photos SET state='failed',error=?,attempts=attempts+1 WHERE _id=? AND $eligible"+(if(expectedFingerprint!=null) " AND fingerprint=?" else ""),
         if(expectedFingerprint==null) arrayOf<Any>(code,id) else arrayOf<Any>(code,id,expectedFingerprint))
     fun retryFailures() = writableDatabase.execSQL("UPDATE photos SET state='pending',error='' WHERE $eligible AND state='failed'")
-    fun saveVectors(id: Long, vectors: List<FloatArray>,expectedFingerprint:String?=null,passages:List<String> = emptyList()) {
+    fun saveVectors(id: Long, vectors: List<FloatArray>,expectedFingerprint:String?=null,passages:List<String> = emptyList(),elapsedMs:Long?=null) {
         require(passages.isEmpty() || passages.size==vectors.size)
         val db=writableDatabase;db.beginTransaction()
         try {
             if(!isEligible(id) || (expectedFingerprint!=null && get(id)?.fingerprint!=expectedFingerprint)) { db.setTransactionSuccessful();return }
             db.delete("vectors","photo_id=?",arrayOf(id.toString()))
             vectors.forEachIndexed { index,vector -> db.execSQL("INSERT INTO vectors(photo_id,chunk,embedding,passage) VALUES (?,?,?,?)",arrayOf(id,index,TextTools.pack(vector),passages.getOrElse(index) { "" })) }
-            db.execSQL("UPDATE photos SET semantic=1 WHERE _id=?",arrayOf(id))
+            db.execSQL("UPDATE photos SET semantic=1,meaning_ms=? WHERE _id=?",arrayOf(elapsedMs,id))
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
     }
@@ -515,10 +512,6 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
             WHERE $where AND f.version=? AND f.fingerprint=photos.fingerprint AND f.error=''""",args+DescriptionFeatures.VERSION).use { c ->
             while(c.moveToNext()) { val value=c.getBlob(1);if(value.size==2048) visit(c.getLong(0),TextTools.unpack(value),c.getString(2)) }
         }
-    }
-    fun descriptionExport(id:Long):org.json.JSONObject?=readableDatabase.rawQuery("SELECT fingerprint,version,embedding,decoded_width,decoded_height,error,elapsed_ms FROM description_features WHERE photo_id=?",arrayOf(id.toString())).use { c ->
-        if(!c.moveToFirst()) null else org.json.JSONObject().put("formatVersion",1).put("fingerprint",c.getString(0)).put("modelVersion",c.getString(1))
-            .put("embeddingF32le",android.util.Base64.encodeToString(c.getBlob(2),android.util.Base64.NO_WRAP)).put("decodedWidth",c.getInt(3)).put("decodedHeight",c.getInt(4)).put("error",c.getString(5)).put("elapsedMs",c.getLong(6))
     }
     fun get(id: Long,brief:Boolean=false): Photo? = readableDatabase.rawQuery("SELECT ${if(brief) columns.replace("ocr_text","substr(ocr_text,1,480) AS ocr_text") else columns} FROM photos WHERE _id=?",arrayOf(id.toString())).use { if(it.moveToFirst()) photo(it) else null }
     fun details(id:Long):PhotoDetails?=readableDatabase.rawQuery("SELECT $columns,blocks,ocr_debug,search_text,previous_text,ocr_version,ocr_ms,expected_text,review_query,match_debug FROM photos WHERE _id=?",arrayOf(id.toString())).use { c ->

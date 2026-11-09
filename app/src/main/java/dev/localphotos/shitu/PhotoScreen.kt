@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.*
@@ -28,14 +29,15 @@ import dev.localphotos.shitu.data.*
     var management by remember { mutableStateOf(false) };var preparation by remember { mutableStateOf(false) }
     var preparationIds by remember { mutableStateOf<List<Long>?>(null) }
     var photo by remember { mutableStateOf<Long?>(null) };var similar by remember { mutableStateOf<Long?>(null) }
-    var clearIds by remember { mutableStateOf<List<Long>?>(null) };var exportIds by remember { mutableStateOf<List<Long>?>(null) }
+    var clearIds by remember { mutableStateOf<List<Long>?>(null) }
+    var guide by rememberSaveable { mutableStateOf(vm.shouldShowGuide()) }
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.refreshLibrary() }
     fun requestPhotos() { permission.launch(buildList {
         if(Build.VERSION.SDK_INT>=33) { add(Manifest.permission.READ_MEDIA_IMAGES);add(Manifest.permission.POST_NOTIFICATIONS) } else add(Manifest.permission.READ_EXTERNAL_STORAGE)
         if(Build.VERSION.SDK_INT>=34) add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
     }.toTypedArray()) }
     Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
-        if(state.selecting) SelectionTools(state,vm,onExport={exportIds=state.selected.toList()},onClear={clearIds=state.selected.toList()},onPrepare={preparationIds=state.selected.toList();preparation=true})
+        if(state.selecting) SelectionTools(state,vm,onClear={clearIds=state.selected.toList()},onPrepare={preparationIds=state.selected.toList();preparation=true})
     }) { padding ->
         LazyVerticalGrid(columns=GridCells.Adaptive(108.dp),modifier=Modifier.fillMaxSize().padding(padding).testTag("results"),contentPadding=PaddingValues(16.dp),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             item(key="header",span={GridItemSpan(maxLineSpan)}) {
@@ -115,14 +117,14 @@ import dev.localphotos.shitu.data.*
     if(sources) SourceSheet(state,vm,{sources=false})
     if(filters) FilterSheet(state,vm,{filters=false})
     if(preparation) PreparationSheet(vm,{preparation=false},ids=preparationIds)
-    if(management) LibrarySheet(state,vm,{management=false},{requestPhotos()})
+    if(management) LibrarySheet(state,vm,{management=false},{requestPhotos()},{management=false;guide=true})
     photo?.let { id ->PhotoInspector(vm,id,{photo=null},onSimilar={photo=null;similar=it}) }
     similar?.let { id ->SimilarPhotos(vm,id,{similar=null}) }
     clearIds?.let { ids ->ClearRecordsDialog(vm,ids,{clearIds=null}) }
-    exportIds?.let { ids ->SampleExportDialog(vm,ids,{exportIds=null}) }
+    if(guide) GettingStarted { vm.finishGuide();guide=false }
 }
 
-@Composable private fun SelectionTools(state:UiState,vm:PhotoViewModel,onExport:()->Unit,onClear:()->Unit,onPrepare:()->Unit) {
+@Composable private fun SelectionTools(state:UiState,vm:PhotoViewModel,onClear:()->Unit,onPrepare:()->Unit) {
     var more by remember { mutableStateOf(false) }
     Surface(tonalElevation=4.dp) {
         Column(Modifier.navigationBarsPadding().padding(horizontal=20.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
@@ -132,8 +134,7 @@ import dev.localphotos.shitu.data.*
                 TextButton(onClick={vm.selecting(false)},modifier=Modifier.testTag("finishSelection")) { Text("完成") }
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick={vm.mark(state.selected.toList(),true)},enabled=state.selected.isNotEmpty(),modifier=Modifier.weight(1f).testTag("markSelected")) { Text("标记") }
-                Button(onClick=onExport,enabled=state.selected.isNotEmpty(),modifier=Modifier.weight(1f).testTag("exportSelected")) { Text("打包所选") }
+                Button(onClick={vm.mark(state.selected.toList(),true)},enabled=state.selected.isNotEmpty(),modifier=Modifier.weight(1f).testTag("markSelected")) { Text("标记") }
                 Box {
                     TextButton(onClick={more=true},modifier=Modifier.testTag("selectionMore")) { Text("更多") }
                     DropdownMenu(more,onDismissRequest={more=false}) {

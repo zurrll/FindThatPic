@@ -9,6 +9,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.localphotos.shitu.core.LocalEmbedder
 import dev.localphotos.shitu.core.OcrEngine
+import dev.localphotos.shitu.core.PaddleOcr
+import dev.localphotos.shitu.core.PaddleTimings
 import dev.localphotos.shitu.core.TextTools
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -19,6 +21,21 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class OfflineModelTest {
     private val context=InstrumentationRegistry.getInstrumentation().targetContext
+    @Test fun batchedOcrKeepsTextAndCoordinatesInTheOriginalOrder()=runBlocking {
+        val image=Bitmap.createBitmap(480,520,Bitmap.Config.ARGB_8888)
+        try {
+            val canvas=Canvas(image);canvas.drawColor(Color.WHITE)
+            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.BLACK;textSize=40f }
+            repeat(6) { canvas.drawText("测试 TEXT",60f,65f+75f*it,paint) }
+            val serialTimes=PaddleTimings();val batchTimes=PaddleTimings()
+            val serial=PaddleOcr(context,maxBatch=1).use { it.lines(image,serialTimes) }
+            val batched=PaddleOcr(context).use { it.lines(image,batchTimes) }
+            assertEquals(6,serial.size)
+            assertEquals(serial.map { it.text to it.box },batched.map { it.text to it.box })
+            assertTrue(batched.zip(serial).all { (a,b) -> kotlin.math.abs(a.confidence-b.confidence)<0.0001f })
+            assertTrue(batchTimes.recognitionCalls<serialTimes.recognitionCalls)
+        } finally { image.recycle() }
+    }
     @Test fun chineseOcrReadsBothEndsOfLongScreenshotOffline()=runBlocking {
         val image=Bitmap.createBitmap(1080,6200,Bitmap.Config.ARGB_8888)
         val canvas=Canvas(image);canvas.drawColor(Color.WHITE)

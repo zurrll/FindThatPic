@@ -20,7 +20,7 @@ class CollectionDataTest {
         val id=db.recent(null,0,1).single().id
         db.complete(id,"cached needle","[]",8);db.saveVectors(id,listOf(floatArrayOf(1f,0f)))
         db.review(id,"other","保留说明","保留预期","旧查询","{\"query\":\"旧查询\"}");db.close()
-        context.openOrCreateDatabase(name,0,null).use { old -> removeCollectionColumns(old);old.version=5 }
+        context.openOrCreateDatabase(name,0,null).use { old -> removeCollectionColumns(old);old.execSQL("ALTER TABLE photos DROP COLUMN meaning_ms");old.version=5 }
         db=PhotoDatabase(context,name)
         try {
             assertEquals("cached needle",db.get(id)!!.text);assertTrue(db.get(id)!!.semantic)

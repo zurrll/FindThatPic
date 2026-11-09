@@ -13,12 +13,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import dev.localphotos.shitu.data.SearchOptions
 import kotlinx.coroutines.runBlocking
-import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
-import java.util.zip.ZipFile
 
 class VisualUiTest {
     @get:Rule val permission=GrantPermissionRule.grant(if(Build.VERSION.SDK_INT>=33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -94,18 +92,10 @@ class VisualUiTest {
                 }.isSuccess }
                 click("photo_${hits.first().photo.id}");click("markOne")
                 compose.waitUntil(5000) { app.database.get(hits.first().photo.id)!!.marked }
-                click("closeInspector");click("similarSelect");click("photo_${hits.first().photo.id}");click("similarExport")
-                compose.onNodeWithTag("exportNote").performTextReplacement("相近图片测试说明")
-                click("generateSamples")
-                compose.waitUntil(20_000) { compose.onAllNodesWithText("分享 ZIP").fetchSemanticsNodes().isNotEmpty() }
-                val file=File(app.cacheDir,"samples").listFiles()!!.filter { it.extension=="zip" }.maxBy { it.lastModified() }
-                ZipFile(file).use { zip ->
-                    val manifest=JSONObject(zip.getInputStream(zip.getEntry("manifest.json")).bufferedReader().readText())
-                    assertEquals(2,manifest.getInt("copiedImages"))
-                    val matches=zip.entries().asSequence().filter { it.name.endsWith("search-match.json") }.map { JSONObject(zip.getInputStream(it).bufferedReader().readText()) }.toList()
-                    assertTrue(matches.any { it.optString("kind")=="visual" && it.optLong("seedId")==seed.id })
-                }
-                click("closeExport");click("closeSimilar")
+                click("closeInspector");click("similarSelect");click("photo_${hits.first().photo.id}")
+                compose.onNodeWithTag("similarMark").assertIsEnabled()
+                compose.onNodeWithTag("similarExport").assertDoesNotExist()
+                click("closeSimilar")
             }
         } finally {
             app.preparation.discard();app.visualIndexer.pause();app.visualEmbedder.unload();app.getSharedPreferences("ui",0).edit().putBoolean("prepare_text",true).putBoolean("prepare_similar",true).putBoolean("prepare_description",true).apply()

@@ -53,7 +53,7 @@ class AdaptiveOcrTest {
         db.upsertBatch(listOf(Photo(key="test",uri="file:///test",name="test.png",folder="Test/",modified=1,size=100,width=1080,height=2400,added=1)),1)
         val id=db.recent(null,0,1).single().id
         db.complete(id,"保留文字","[]",0);db.saveVectors(id,listOf(floatArrayOf(1f,0f)),passages=listOf("保留文字"));db.close()
-        context.openOrCreateDatabase(name,0,null).use { old -> removeMetadataColumns(old);old.execSQL("ALTER TABLE photos DROP COLUMN match_debug");old.version=3 }
+        context.openOrCreateDatabase(name,0,null).use { old -> removeMetadataColumns(old);old.execSQL("ALTER TABLE photos DROP COLUMN match_debug");old.execSQL("ALTER TABLE photos DROP COLUMN meaning_ms");old.version=3 }
         db=PhotoDatabase(context,name)
         try {
             assertTrue(db.get(id)!!.semantic);assertEquals("保留文字",db.get(id)!!.text)

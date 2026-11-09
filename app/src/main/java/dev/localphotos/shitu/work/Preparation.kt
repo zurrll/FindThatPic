@@ -152,9 +152,10 @@ class PreparationWorker(context:Context,params:WorkerParameters):CoroutineWorker
                                             currentCoroutineContext().ensureActive();app.database.fail(id,if(e is SecurityException) "permission_changed" else "ocr_failed",photo.fingerprint)
                                         }
                                         "meaning"->{
+                                            val meaningStart=SystemClock.elapsedRealtime()
                                             val passages=SemanticText.passages(photo.text);val vectors=mutableListOf<FloatArray>()
                                             for(chunk in passages) { currentCoroutineContext().ensureActive();vectors+=app.embedder.encode(TextTools.embeddingText(chunk)) }
-                                            currentCoroutineContext().ensureActive();app.database.saveVectors(id,vectors,photo.fingerprint,passages)
+                                            currentCoroutineContext().ensureActive();app.database.saveVectors(id,vectors,photo.fingerprint,passages,elapsedMs=SystemClock.elapsedRealtime()-meaningStart)
                                         }
                                         "similar"->try { app.visualSearch.prepare(id) }
                                             catch(e:CancellationException) { throw e } catch(e:Exception) { recordFailure(photo,e,false,tick) }

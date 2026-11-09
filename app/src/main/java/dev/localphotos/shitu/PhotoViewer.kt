@@ -173,6 +173,6 @@ private object PhotoPreviews {
     val cache=object:LruCache<String,Bitmap>(20*1024*1024) { override fun sizeOf(key:String,value:Bitmap)=value.allocationByteCount }
 }
 internal fun copyText(context:Context,label:String,value:String) {
-    if(value.length>200_000) { android.widget.Toast.makeText(context,"内容较大，请批量打包导出",android.widget.Toast.LENGTH_SHORT).show();return }
+    if(value.length>200_000) { android.widget.Toast.makeText(context,"内容过长，无法复制",android.widget.Toast.LENGTH_SHORT).show();return }
     (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(label,value))
 }

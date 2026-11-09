@@ -94,6 +94,7 @@ class IndexWorker(context:Context,params:WorkerParameters):CoroutineWorker(conte
                 val updated=app.database.get(photo.id)
                 if(semantic && updated?.state=="done" && !updated.semantic) {
                     app.progress.value=app.progress.value.copy(phase="建立中文含义索引")
+                    val meaningStart=SystemClock.elapsedRealtime()
                     val vectors=mutableListOf<FloatArray>()
                     try {
                         val passages=SemanticText.passages(updated.text)
@@ -102,7 +103,7 @@ class IndexWorker(context:Context,params:WorkerParameters):CoroutineWorker(conte
                             while(app.embedder.searching) delay(100)
                             vectors+=app.embedder.encode(TextTools.embeddingText(chunk))
                         }
-                        app.database.saveVectors(photo.id,vectors,updated.fingerprint,passages)
+                        app.database.saveVectors(photo.id,vectors,updated.fingerprint,passages,elapsedMs=SystemClock.elapsedRealtime()-meaningStart)
                     } catch(e:CancellationException) { throw e }
                     catch(_:Exception) { phase="含义索引暂不可用，文字搜索仍可用";return@withContext Result.failure() }
                 }

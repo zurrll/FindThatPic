@@ -21,10 +21,13 @@ class DescriptionTest {
         var db=PhotoDatabase(app,name);db.upsertBatch((1..4).map(::photo),1);val images=db.recent(null,0,10).sortedBy { it.added };val p=images[0]
         db.complete(p.id,"保留原文字","[]",3);db.saveVectors(p.id,listOf(FloatArray(512).apply { this[0]=1f }));db.mark(listOf(p.id),true);db.saveFeedback(p.id,"保留说明","查询","{}")
         db.saveVisual(p,VisualFeatures(FloatArray(1280).apply { this[0]=1f },0,ByteArray(768),224,224),1);db.close()
-        app.openOrCreateDatabase(name,0,null).use { old ->old.execSQL("DROP TABLE description_features");old.version=7 }
+        app.openOrCreateDatabase(name,0,null).use { old ->old.execSQL("DROP TABLE description_features");old.execSQL("ALTER TABLE photos DROP COLUMN meaning_ms");old.version=7 }
         db=PhotoDatabase(app,name)
         try {
             assertEquals("保留原文字",db.get(p.id)!!.text);assertTrue(db.get(p.id)!!.semantic);assertTrue(db.get(p.id)!!.marked);assertEquals("保留说明",db.get(p.id)!!.reviewNote);assertNotNull(db.visual(p.id))
+            assertFalse(db.searchDiagnostics(p.id).has("meaningMs"))
+            db.saveVectors(p.id,listOf(FloatArray(512).apply { this[0]=1f }),elapsedMs=42)
+            assertEquals(42L,db.searchDiagnostics(p.id).getLong("meaningMs"))
             assertEquals(1,db.preparationStats().ocr);assertEquals(0,db.preparationStats().description)
             assertFalse(p.id in db.pendingPreparationStage(images.map { it.id },"ocr",false));assertFalse(p.id in db.pendingPreparationStage(images.map { it.id },"similar",false))
             assertTrue(p.id in db.pendingPreparationStage(images.map { it.id },"description",false))

@@ -83,7 +83,7 @@ class SemanticDataTest {
             old.execSQL("DROP TABLE temp_vectors")
             old.execSQL("UPDATE index_versions SET version='bge-75c43b0:wordpiece-v1:cls256' WHERE name='semantic'")
             removeMetadataColumns(old);old.execSQL("ALTER TABLE photos DROP COLUMN match_debug")
-            old.version=2
+            old.execSQL("ALTER TABLE photos DROP COLUMN meaning_ms");old.version=2
         }
         db=PhotoDatabase(context,name)
         try {

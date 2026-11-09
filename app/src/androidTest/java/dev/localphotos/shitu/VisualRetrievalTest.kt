@@ -95,7 +95,7 @@ class VisualRetrievalTest {
         val p=db.recent(null,0,1).single()
         db.complete(p.id,"原有文字","[]",2);db.saveVectors(p.id,listOf(floatArrayOf(1f,0f)))
         db.mark(listOf(p.id),true);db.saveFeedback(p.id,"原有说明","查询","{}");db.setFolderExcluded("Download/Hidden/",true);db.close()
-        context.openOrCreateDatabase(name,0,null).use { old -> old.execSQL("DROP TABLE visual_features");old.version=6 }
+        context.openOrCreateDatabase(name,0,null).use { old -> old.execSQL("DROP TABLE visual_features");old.execSQL("ALTER TABLE photos DROP COLUMN meaning_ms");old.version=6 }
         db=PhotoDatabase(context,name)
         try {
             assertEquals("原有文字",db.get(p.id)!!.text);assertTrue(db.get(p.id)!!.semantic);assertTrue(db.get(p.id)!!.marked)

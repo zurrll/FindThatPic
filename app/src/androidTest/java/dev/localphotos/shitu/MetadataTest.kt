@@ -62,7 +62,7 @@ class MetadataTest {
         val id=db.recent(null,0,1).single().id
         db.complete(id,"保留识别结果","[]",8);db.saveVectors(id,listOf(floatArrayOf(1f,0f)))
         db.review(id,"good","保留备注","","","{\"query\":\"保留\"}");db.close()
-        context.openOrCreateDatabase(name,0,null).use { old -> removeMetadataColumns(old);old.version=4 }
+        context.openOrCreateDatabase(name,0,null).use { old -> removeMetadataColumns(old);old.execSQL("ALTER TABLE photos DROP COLUMN meaning_ms");old.version=4 }
         db=PhotoDatabase(context,name)
         try {
             assertEquals("保留识别结果",db.get(id)!!.text)

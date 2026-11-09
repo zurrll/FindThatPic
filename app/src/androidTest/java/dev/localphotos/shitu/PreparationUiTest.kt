@@ -88,6 +88,12 @@ class PreparationUiTest {
                 if(BuildConfig.HAS_DESCRIPTION) click("searchModeTEXT")
                 compose.onNodeWithTag("searchField").performTextReplacement("保留旧文字记录")
                 compose.waitUntil(15_000) { !vm.state.value.searching && vm.state.value.hits.firstOrNull()?.photo?.id==old.id }
+                click("librarySettings");click("openGuide")
+                compose.onNodeWithText("先补全搜索信息").assertIsDisplayed()
+                click("guideNext");compose.onNodeWithText("隐藏不想搜的目录").assertIsDisplayed()
+                click("guideNext");compose.onNodeWithText(if(BuildConfig.HAS_DESCRIPTION) "首页 → 文字搜索 / 描述找图" else "首页 → 搜索框").assertIsDisplayed()
+                click("guideNext");compose.onNodeWithText("用一张图找相近").assertIsDisplayed()
+                click("guideNext");compose.onNodeWithTag("gettingStarted").assertDoesNotExist()
                 click("librarySettings");click("maintenance");click("performanceReport")
                 compose.waitUntil(10_000) { compose.onAllNodesWithTag("closeReport").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithText("导出报告").assertIsDisplayed()

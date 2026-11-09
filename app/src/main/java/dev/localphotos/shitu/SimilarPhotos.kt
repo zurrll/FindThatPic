@@ -26,16 +26,16 @@ private class SimilarPage(val id:Long) {
 }
 private data class SimilarSnapshot(val hits:List<Hit>,val stats:VisualStats,val revision:Long)
 @Composable internal fun SimilarPhotos(vm:PhotoViewModel,seedId:Long,onDismiss:()->Unit) {
-    val app=vm.app;val coroutine=rememberCoroutineScope()
+    val app=vm.app
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val state by vm.state.collectAsStateWithLifecycle()
     val available=remember(seedId) { state.options.copy(originalOnly=false,order=ResultOrder.RELEVANCE) }
     val pages=remember(seedId) { mutableStateListOf(SimilarPage(seedId)) };val page=pages.last()
     var currentScope by remember { mutableStateOf(false) };val options=if(currentScope) available else SearchOptions()
     val stats=page.stats;var inspected by remember { mutableStateOf<Hit?>(null) }
-    var exported by remember { mutableStateOf<List<Long>?>(null) };var preparing by remember { mutableStateOf(false) }
+    var preparing by remember { mutableStateOf(false) }
     var loading by remember(page.id) { mutableStateOf(page.scope==null) };var failure by remember(page.id) { mutableStateOf("") }
-    val covered=inspected!=null || preparing || exported!=null
+    val covered=inspected!=null || preparing
     LaunchedEffect(page.id,options,lifecycle,covered) {
         if(covered) return@LaunchedEffect
         // Keep a scan alive during indexing. StateFlow conflates writes while it runs; the next
@@ -105,10 +105,7 @@ private data class SimilarSnapshot(val hits:List<Hit>,val stats:VisualStats,val 
                     Row(verticalAlignment=Alignment.CenterVertically) { Text("已选 ${page.selected.size} 张",modifier=Modifier.weight(1f));TextButton(onClick={page.selected=page.hits.map { it.photo.id }.toSet()},modifier=Modifier.testTag("similarSelectAll")) { Text("选择全部候选") } }
                     Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(onClick={vm.mark(page.selected.toList(),true)},enabled=page.selected.isNotEmpty(),modifier=Modifier.weight(1f).testTag("similarMark")) { Text("标记") }
-                        Button(onClick={coroutine.launch {
-                            val selected=page.hits.filter { it.photo.id in page.selected };withContext(Dispatchers.IO) { selected.forEach { app.database.saveMatch(it.photo.id,"",it.matchDebug) } }
-                            exported=(listOf(page.id)+selected.map { it.photo.id }).distinct()
-                        }},enabled=page.selected.isNotEmpty(),modifier=Modifier.weight(1f).testTag("similarExport")) { Text("打包所选与参照图") }
+
                     }
                 }
             }
@@ -116,5 +113,4 @@ private data class SimilarSnapshot(val hits:List<Hit>,val stats:VisualStats,val 
     }
     inspected?.let { hit ->PhotoInspector(vm,hit.photo.id,onDismiss={inspected=null},onSimilar={next(it)},match=hit) }
     if(preparing) PreparationSheet(vm,{preparing=false},options=options)
-    exported?.let { ids ->SampleExportDialog(vm,ids,{exported=null}) }
 }

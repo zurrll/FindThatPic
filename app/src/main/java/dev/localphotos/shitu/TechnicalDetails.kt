@@ -71,6 +71,13 @@ import org.json.JSONObject
                         if(p.error.isNotBlank()) InfoRow("错误",p.error)
                         Disclosure("处理参数") { InfoRow("策略",ocr.optString("strategy","旧记录未提供"));InfoRow("EXIF 方向",ocr.optInt("orientation",1).toString());InfoRow("识别坐标尺寸","${ocr.optInt("uprightWidth",p.width)} × ${ocr.optInt("uprightHeight",p.height)}") }
                     }
+                    ocr.optJSONObject("timings")?.let { time ->
+                        Disclosure("识别耗时明细") {
+                            SectionCard {
+                                OcrTimingsCard(time, ocr.optLong("mergeMs"))
+                            }
+                        }
+                    }
                     SectionCard { Text("识别文字 · ${p.text.length} 字符",style=MaterialTheme.typography.titleMedium);SelectableValue(p.text.ifBlank { "暂无文字" }) }
                     Disclosure("逐块耗时与输入尺寸") {
                         val tiles=ocr.optJSONArray("tiles")?:JSONArray()
@@ -78,7 +85,8 @@ import org.json.JSONObject
                             val t=tiles.getJSONObject(i)
                             SectionCard { Text("输入 ${i+1} · ${t.optString("reason","识别输入")}",style=MaterialTheme.typography.titleSmall)
                                 InfoRow("解码 / 识别","${t.optLong("decodeMs")} / ${t.optLong("ocrMs")} ms")
-                                InfoRow("输入像素","${t.optInt("decodedWidth")} × ${t.optInt("decodedHeight")}");InfoRow("采样倍率",t.optInt("sampleSize",1).toString()) }
+                                InfoRow("输入像素","${t.optInt("decodedWidth")} × ${t.optInt("decodedHeight")}");InfoRow("采样倍率",t.optInt("sampleSize",1).toString())
+                                t.optJSONObject("timings")?.let { OcrTimingsCard(it) } }
                         }
                     }
                     Disclosure("原始输出与历史") {
@@ -92,7 +100,8 @@ import org.json.JSONObject
                     SectionCard { Text("文字向量",style=MaterialTheme.typography.titleMedium)
                         InfoRow("模型","BGE-small-zh-v1.5 · INT8");InfoRow("状态",if(p.semantic) "已准备" else if(p.state=="empty") "无文字，无需计算" else "尚未准备")
                         InfoRow("段落数",passages.length().toString());InfoRow("向量维度","512 / 段");InfoRow("最大输入","256 token / 段")
-                        InfoRow("索引版本",f.optString("meaningVersion","未记录")) }
+                        if(p.semantic) InfoRow("准备耗时",if(f.has("meaningMs")) "${f.optLong("meaningMs")} ms" else "旧记录未计时")
+                    InfoRow("索引版本",f.optString("meaningVersion","未记录")) }
                     for(i in 0 until passages.length()) {
                         val passage=passages.getJSONObject(i)
                         SectionCard { Text("段落 ${i+1}",style=MaterialTheme.typography.titleSmall);SelectableValue(passage.optString("text").ifBlank { "旧记录未保存分段文字" });InfoRow("向量维度",passage.optInt("dimensions").toString()) }
@@ -129,6 +138,16 @@ internal fun featureStatus(value:JSONObject?,fingerprint:String,version:String,d
     value.optInt("bytes")!=dimensions*4 ->"特征不完整"
     else ->"已准备"
 }
+@Composable
+private fun OcrTimingsCard(value:JSONObject, mergeMs:Long?=null) {
+    if(value.has("decodeImageMs")) InfoRow("图块解码","${value.optLong("decodeImageMs")} ms")
+    InfoRow("模型准备 / 像素转换","${value.optLong("loadMs")} / ${value.optLong("inputMs")} ms")
+    InfoRow("检测推理 / 提取文字框","${value.optLong("detectMs")} / ${value.optLong("boxesMs")} ms")
+    InfoRow("识别推理 / 转为文字","${value.optLong("recognizeMs")} / ${value.optLong("decodeTextMs")} ms")
+    InfoRow("文字框 / 识别调用","${value.optInt("boxCount")} / ${value.optInt("recognitionCalls")}")
+    if(mergeMs!=null) InfoRow("整理文字","$mergeMs ms")
+}
+
 @Composable private fun FeatureCard(title:String,model:String,value:JSONObject?,fingerprint:String,version:String,dimensions:Int) {
     SectionCard { Text(title,style=MaterialTheme.typography.titleMedium);InfoRow("模型",model)
         InfoRow("状态",featureStatus(value,fingerprint,version,dimensions))
@@ -168,7 +187,7 @@ internal fun featureStatus(value:JSONObject?,fingerprint:String,version:String,d
 }
 @Composable internal fun SelectableValue(value:String,mono:Boolean=false) {
     SelectionContainer { Text(value.take(30000).ifBlank { "暂无内容" },style=MaterialTheme.typography.bodyMedium,fontFamily=if(mono) FontFamily.Monospace else FontFamily.Default) }
-    if(value.length>30000) Text("界面显示前 30000 字符，完整内容可批量打包。",style=MaterialTheme.typography.bodySmall)
+    if(value.length>30000) Text("界面显示前 30000 字符。",style=MaterialTheme.typography.bodySmall)
 }
 @Composable private fun OcrOverlay(data:InspectorData,debug:JSONObject) {
     var overlay by remember { mutableStateOf("无框") }

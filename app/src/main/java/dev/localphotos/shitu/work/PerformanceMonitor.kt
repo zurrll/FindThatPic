@@ -16,8 +16,9 @@ class PerformanceMonitor(private val context:Context) {
         val memory=Debug.MemoryInfo();Debug.getMemoryInfo(memory)
         prefs.edit().putInt("peak_pss_kb",maxOf(prefs.getInt("peak_pss_kb",0),memory.totalPss)).apply()
     }
+    private fun preparationKey(stage:String) = "prepare_ms_${stage}_build_${BuildConfig.VERSION_CODE}"
     @Synchronized fun preparation(stage:String,ms:Long) {
-        val key="prepare_ms_$stage"
+        val key=preparationKey(stage)
         val times=prefs.getString(key,"")!!.split(',').mapNotNull(String::toLongOrNull).takeLast(99)+ms
         prefs.edit().putString(key,times.joinToString(",")).apply()
     }
@@ -35,9 +36,11 @@ class PerformanceMonitor(private val context:Context) {
         (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(memory)
         val preparation=JSONObject()
         for(stage in listOf("ocr","meaning","similar")+if(BuildConfig.HAS_DESCRIPTION) listOf("description") else emptyList()) {
-            val times=prefs.getString("prepare_ms_$stage","")!!.split(',').mapNotNull(String::toLongOrNull).sorted()
-            preparation.put(stage,JSONObject().put("samples",times.size).put("p50_ms",times.getOrNull((times.size-1).coerceAtLeast(0)/2)?:JSONObject.NULL)
-                .put("p95_ms",times.getOrNull(((times.size-1).coerceAtLeast(0)*.95).toInt())?:JSONObject.NULL))
+            val times=prefs.getString(preparationKey(stage),"")!!.split(',').mapNotNull(String::toLongOrNull)
+            val sorted=times.sorted()
+            fun percentile(p:Double)=sorted.getOrNull(((sorted.size-1).coerceAtLeast(0)*p).toInt())?:JSONObject.NULL
+            preparation.put(stage,JSONObject().put("samples",times.size).put("p50_ms",percentile(.5))
+                .put("p95_ms",percentile(.95)).put("last_ms",times.lastOrNull()?:JSONObject.NULL))
         }
         val db=context.getDatabasePath("photos.db")
         return JSONObject().apply {

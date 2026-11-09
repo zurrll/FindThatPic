@@ -49,9 +49,9 @@ internal fun elapsedLabel(ms:Long)=if(ms<1000) "$ms ms" else String.format(Local
             val stages=data.optJSONObject("preparation_latency")?:JSONObject()
             for((key,label) in listOf("ocr" to "OCR","meaning" to "文字含义","similar" to "相近特征") + if(BuildConfig.HAS_DESCRIPTION) listOf("description" to "画面描述") else emptyList()) {
                 val v=stages.optJSONObject(key)?:JSONObject()
-                InfoRow(label,if(v.optInt("samples")==0) "尚未记录" else "${v.optInt("samples")} 次 · 中位 ${elapsedLabel(v.optLong("p50_ms"))} · P95 ${elapsedLabel(v.optLong("p95_ms"))}")
+                InfoRow(label,if(v.optInt("samples")==0) "尚未记录" else "${v.optInt("samples")} 次 · 中位 ${elapsedLabel(v.optLong("p50_ms"))} · P95 ${elapsedLabel(v.optLong("p95_ms"))} · 最近 ${elapsedLabel(v.optLong("last_ms"))}")
             }
-            Text("各阶段最近 100 次实际处理，包含首次加载；跳过已有记录不计入。",style=MaterialTheme.typography.bodySmall)
+            Text("本构建各阶段最近 100 次处理，包含首次加载。已有记录跳过时不计入。",style=MaterialTheme.typography.bodySmall)
         }
     }
     val rows=data.optJSONArray("recent_searches")

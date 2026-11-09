@@ -1,28 +1,36 @@
 # 拾图 · FindThatPic
 
-Android 离线图片搜索。用截图里的字、文件名、画面描述或一张参考图找回手机里的图片。支持 Android 10 及以上的 ARM64 设备。
+记得截图里有「取件码」，却忘了存在哪？打开拾图，搜你还记得的几个字。也可以拿一张照片找相近图片，或在普通版里直接描述你想找的画面。
 
-| 功能 | 轻量版 | 普通版 |
-| --- | :---: | :---: |
-| Paddle OCR、文字与含义搜索、选图找相近 | ✓ | ✓ |
-| 技术详情、性能报告、批量标记与导出 | ✓ | ✓ |
-| 用文字描述找画面 |  | ✓ |
+[下载 APK](https://github.com/zurrll/FindThatPic/releases) · Android 10+ · ARM64
 
-[下载 0.0.1 APK](https://github.com/zurrll/FindThatPic/releases/tag/v0.0.1)。普通版沿用旧包名，同签名可覆盖升级并保留索引。轻量版可与普通版并存，分别管理索引和标记。
+<p>
+  <img src="docs/screenshots/guide.png" alt="拾图操作指引，第一步是补全搜索信息" width="230">
+  <img src="docs/screenshots/text-search.png" alt="搜索取件码，找到两张包裹通知示例" width="230">
+  <img src="docs/screenshots/similar.png" alt="从一张山景照片找到同一片风景的另外两张照片" width="230">
+</p>
 
-## 使用
+## 第一次用
 
-1. 授权照片访问，点首页「补全搜索信息」。可选处理范围、暂停和继续，已完成的结果会复用。
-2. 搜截图文字、近义表达或文件名。在普通版也可以切换到「描述找图」。打开任意图片可点「找相近」，并从结果继续查找。
-3. 用「目录」和「筛选」缩小范围。在设置中可排除目录或清除文字识别记录。
+1. **选择可访问的照片。** 看完或跳过首用指引后，在首页授权图库。指引可从「设置 → 操作指引」重看。
+2. **点「补全搜索信息」。** 可以先处理 100 张，再慢慢补齐。已有结果会复用，暂停后可以继续。
+3. **试着找一张图。** 搜「取件码」找截图，普通版可切到「描述找图」搜「一只橘猫」。手边已有一张参考图时，打开它，点「找相近」。
 
-单图的「更多 → 技术详情」显示识别记录与匹配依据。性能报告在「设置 → 测试与维护」。需要反馈问题时，可批量标记和导出选中图片，填一段可选说明。
+只想搜某个目录或日期，可以用首页的「目录」和「筛选」。如果有缓存图之类一直不想看到，在「设置 → 排除目录」里隐藏它们和子目录。原图留在手机上。
 
-应用无联网权限，原图只读，索引留在本机。导出由用户主动触发，ZIP 可包含原图、路径、识别文字和诊断信息。应用只读取系统收录且已授权的图片。相近和画面描述提供候选，复杂画面、小字和没有匹配目标时都可能排错。
+## 选哪个版本
 
-## 构建
+| | 轻量版 | 普通版 |
+| --- | --- | --- |
+| 搜图片里的字、近义词和文件名 | 支持 | 支持 |
+| 以图找相近、批量标记 | 支持 | 支持 |
+| 用一句话描述画面 | — | 支持 |
 
-需要 JDK 17、Android SDK 36、Build Tools 35.0.0 和 Python 3.9+。配置 `ANDROID_HOME` 或在 `local.properties` 中设置 `sdk.dir`。
+两版都在手机上处理图片，无联网权限，原图只读。普通版沿用旧包名，同签名可以覆盖升级；两版可并存，分别保存索引和标记。
+
+## 从源码构建
+
+需要 JDK 17、Android SDK 36、Build Tools 35.0.0 和 Python 3.9+。设置 `ANDROID_HOME`，或在 `local.properties` 里填写 `sdk.dir`。
 
 ```sh
 python3 -m pip install -r scripts/model-requirements.txt
@@ -30,6 +38,6 @@ python3 scripts/fetch_models.py --edition standard
 ./gradlew :app:assembleLiteRelease :app:assembleStandardRelease
 ```
 
-只构建轻量版可用 `--edition lite` 和 `:app:assembleLiteRelease`。APK 位于 `app/build/outputs/apk/<版本>/release/`。当前私有测试 APK 用开发签名。
+只构建轻量版时，把模型参数换成 `--edition lite`，运行 `:app:assembleLiteRelease`。APK 在 `app/build/outputs/apk/<版本>/release/`。
 
-[开发与设计](docs/DEVELOPMENT.md) · [模型来源与许可](THIRD_PARTY_NOTICES.md) · [MIT 源码许可](LICENSE)
+[开发与设计](docs/DEVELOPMENT.md) · [第三方许可](THIRD_PARTY_NOTICES.md) · [源码许可](LICENSE)
