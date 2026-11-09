@@ -12,4 +12,4 @@
 | Chinese-CLIP RN50 | [OFA-Sys 权重，Apache-2.0](https://huggingface.co/OFA-Sys/chinese-clip-rn50)。拾图将图像与文字编码器分别导出为 ONNX 并量化。另附 [OFA-Sys 代码的 MIT 声明](https://github.com/OFA-Sys/Chinese-CLIP/blob/master/MIT-LICENSE.txt)。 |
 | OpenCC TSCharacters | [BYVoid/OpenCC，Apache-2.0](https://github.com/BYVoid/OpenCC/blob/ver.1.1.9/data/dictionary/TSCharacters.txt)。使用原始字符表做检索归一化。 |
 
-随包声明见 `app/src/main/resources/` 和 `app/src/standard/resources/`。设备测试素材来源见对应测试资源目录。
+随包声明见 `app/src/main/resources/`。设备测试素材来源见对应测试资源目录。

@@ -61,13 +61,11 @@ def fetch_description(destination, source):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--edition", choices=("lite", "standard"), default="standard")
-    parser.add_argument("--description-assets", type=Path, help="directory with the prepared RN50 ONNX assets")
+    parser.add_argument("--description-assets", type=Path, help="directory with the verified RN50 ONNX assets")
     args = parser.parse_args()
-    if args.edition == "standard":
-        fetch_description(ROOT / "app/src/standard/assets/models", args.description_assets)
     manifest = json.loads(MANIFEST.read_text())
     destination = ROOT / "app/src/main/assets/models"
+    fetch_description(destination, args.description_assets)
     destination.mkdir(parents=True, exist_ok=True)
     for item in manifest["files"]:
         target = destination / item["name"]

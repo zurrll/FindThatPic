@@ -10,28 +10,14 @@ android {
         applicationId = "dev.localphotos.shitu"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20
+        versionCode = 21
         versionName = "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
-    flavorDimensions += "edition"
-    productFlavors {
-        create("lite") {
-            dimension = "edition"
-            applicationIdSuffix = ".lite"
-            buildConfigField("boolean", "HAS_DESCRIPTION", "false")
-            resValue("string", "edition_name", "轻量版")
-        }
-        create("standard") {
-            dimension = "edition"
-            buildConfigField("boolean", "HAS_DESCRIPTION", "true")
-            resValue("string", "edition_name", "普通版")
-        }
-    }
     buildTypes {
         release {
-            // Local trial APK; publishing requires a separately managed release key.
+            // Keep the signing identity used by existing installations.
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
         }

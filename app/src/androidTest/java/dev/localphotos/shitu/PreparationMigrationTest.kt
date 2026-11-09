@@ -26,7 +26,7 @@ class PreparationMigrationTest {
             app.preparation.restore(adoptLegacy=true)
             val job=app.preparation.readJob()!!
             assertEquals("[11,12,13]",job.getJSONArray("ids").toString());assertFalse(job.getBoolean("finished"))
-            assertEquals(if(BuildConfig.HAS_DESCRIPTION) 4 else 3,app.preparation.kinds(job).stages.size);assertTrue(app.progress.value.paused);assertFalse(app.progress.value.running)
+            assertEquals(4,app.preparation.kinds(job).stages.size);assertTrue(app.progress.value.paused);assertFalse(app.progress.value.running)
             assertTrue(WorkManager.getInstance(app).getWorkInfosForUniqueWork(Preparation.WORK).get().all { it.state.isFinished })
             assertTrue(JSONObject(File(directory,"current.json").readText()).getBoolean("finished"))
             assertTrue(JSONObject(File(directory,"visual.json").readText()).getBoolean("finished"))

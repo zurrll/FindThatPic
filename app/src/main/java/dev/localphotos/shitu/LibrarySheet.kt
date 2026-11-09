@@ -37,7 +37,7 @@ import java.io.File
                 Spacer(Modifier.height(8.dp))
                 QuietHeading("帮助")
                 LibraryRow("操作指引",UiIcons.Search,onGuide,tag="openGuide")
-                LibraryRow("关于拾图",UiIcons.Info,{about=true},value=context.getString(R.string.edition_name))
+                LibraryRow("关于拾图",UiIcons.Info,{about=true},value=BuildConfig.VERSION_NAME)
                 Spacer(Modifier.height(8.dp))
                 QuietHeading("诊断与维护")
                 LibraryRow("性能报告",UiIcons.Info,{scope.launch { report=withContext(Dispatchers.IO) { vm.app.metrics.report() } }},tag="performanceReport")

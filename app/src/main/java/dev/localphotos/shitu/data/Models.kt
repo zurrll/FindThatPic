@@ -1,6 +1,5 @@
 package dev.localphotos.shitu.data
 
-import dev.localphotos.shitu.BuildConfig
 
 data class Photo(
     val id: Long = 0, val key: String, val uri: String, val name: String,
@@ -36,8 +35,8 @@ object PhotoLimits { const val SAMPLE_BATCH=500; const val OCR_BATCH=500 }
 
 data class VisualStats(val total:Int=0,val ready:Int=0,val failed:Int=0)
 enum class SearchMode(val label:String) { TEXT("文字"), DESCRIPTION("画面") }
-data class PreparationKinds(val text:Boolean=true,val similar:Boolean=true,val description:Boolean=BuildConfig.HAS_DESCRIPTION) {
-    val stages get()=buildList { if(text) { add("ocr");add("meaning") };if(similar) add("similar");if(BuildConfig.HAS_DESCRIPTION && description) add("description") }
+data class PreparationKinds(val text:Boolean=true,val similar:Boolean=true,val description:Boolean=true) {
+    val stages get()=buildList { if(text) { add("ocr");add("meaning") };if(similar) add("similar");if(description) add("description") }
 }
 data class PreparationStats(val total:Int=0,val ocr:Int=0,val ocrFailed:Int=0,val meaning:Int=0,val withText:Int=0,
     val similar:Int=0,val similarFailed:Int=0,val description:Int=0,val descriptionFailed:Int=0,val complete:Int=0) {

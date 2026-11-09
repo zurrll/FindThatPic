@@ -55,8 +55,8 @@ data class UiState(val access:String="尚未授权照片",val allowed:Boolean=fa
 class PhotoViewModel(application:Application):AndroidViewModel(application) {
     val app=application as PhotoApp
     private val prefs=app.getSharedPreferences("ui",0)
-    private val mutable=MutableStateFlow(UiState(allowed=app.library.hasAccess(),access=app.library.accessDescription(),limit=prefs.getInt("limit",100),mode=if(BuildConfig.HAS_DESCRIPTION && prefs.getString("search_mode","TEXT")==SearchMode.DESCRIPTION.name) SearchMode.DESCRIPTION else SearchMode.TEXT,
-        kinds=PreparationKinds(prefs.getBoolean("prepare_text",true),prefs.getBoolean("prepare_similar",true),BuildConfig.HAS_DESCRIPTION && prefs.getBoolean("prepare_description",true))))
+    private val mutable=MutableStateFlow(UiState(allowed=app.library.hasAccess(),access=app.library.accessDescription(),limit=prefs.getInt("limit",100),mode=if(prefs.getString("search_mode","TEXT")==SearchMode.DESCRIPTION.name) SearchMode.DESCRIPTION else SearchMode.TEXT,
+        kinds=PreparationKinds(prefs.getBoolean("prepare_text",true),prefs.getBoolean("prepare_similar",true),prefs.getBoolean("prepare_description",true))))
     val state=mutable.asStateFlow()
     val progress=app.progress.sample(160).stateIn(viewModelScope,SharingStarted.Eagerly,app.progress.value)
     private val queries=MutableStateFlow(0)
@@ -138,7 +138,6 @@ class PhotoViewModel(application:Application):AndroidViewModel(application) {
     fun query(value:String)=requestSearch { it.copy(query=value) }
     fun searchNow() { queries.value++ }
     fun mode(value:SearchMode) {
-        if(value==SearchMode.DESCRIPTION && !BuildConfig.HAS_DESCRIPTION) return
         prefs.edit().putString("search_mode",value.name).apply()
         requestSearch { it.copy(mode=value) }
     }
@@ -231,7 +230,7 @@ class PhotoViewModel(application:Application):AndroidViewModel(application) {
         val onCoarse:(List<Hit>)->Unit={ rows ->mutable.update { if(current(it)) it.copy(hits=rows) else it } }
         try {
             result=withContext(Dispatchers.IO) {
-                if(BuildConfig.HAS_DESCRIPTION && s.mode==SearchMode.DESCRIPTION && querying) {
+                if(s.mode==SearchMode.DESCRIPTION && querying) {
                     if(app.database.preparationStats(s.options).description==0) {
                         unavailable("先补全画面信息")
                         emptyList()

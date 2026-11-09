@@ -66,7 +66,7 @@ import dev.localphotos.shitu.data.*
                         trailingIcon={
                             Row(verticalAlignment=Alignment.CenterVertically) {
                                 if(state.query.isNotEmpty()) IconButton(onClick={vm.query("")},modifier=Modifier.testTag("clearQuery")) { Icon(UiIcons.Close,"清除搜索",Modifier.size(18.dp)) }
-                                if(BuildConfig.HAS_DESCRIPTION) Box {
+                                Box {
                                     TextButton(onClick={endInput();searchModes=true},modifier=Modifier.testTag("searchModeMenu")) {
                                         Text(if(state.mode==SearchMode.TEXT) "文字" else "画面")
                                         Icon(UiIcons.Down,"切换搜索方式",Modifier.size(16.dp))

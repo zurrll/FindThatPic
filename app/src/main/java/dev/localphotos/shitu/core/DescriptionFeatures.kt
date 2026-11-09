@@ -4,7 +4,8 @@ data class DescriptionFeatures(val embedding:FloatArray,val width:Int,val height
     companion object {
         const val DIMENSIONS=1024
         const val BYTES=DIMENSIONS*4
-        const val MODEL_LABEL="Chinese-CLIP RN50 · INT8"
+        const val MODEL_NAME="Chinese-CLIP RN50"
+        const val MODEL_LABEL="$MODEL_NAME · INT8"
         const val VERSION="cnclip-rn50-717ba21:q8:fit224-bicubic:bert52-lower:1024-v1"
     }
 }

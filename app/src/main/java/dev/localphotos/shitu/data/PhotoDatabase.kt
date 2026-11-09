@@ -7,7 +7,6 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import dev.localphotos.shitu.core.TextTools
 import dev.localphotos.shitu.core.VisualFeatures
-import dev.localphotos.shitu.BuildConfig
 import dev.localphotos.shitu.core.DescriptionFeatures
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -89,7 +88,7 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
     /** Diagnostics read metadata and passage text, never decode images or load model sessions. */
     fun searchDiagnostics(id:Long):org.json.JSONObject {
         val result=org.json.JSONObject()
-        for(table in if(BuildConfig.HAS_DESCRIPTION) listOf("visual_features","description_features") else listOf("visual_features")) {
+        for(table in listOf("visual_features","description_features")) {
             readableDatabase.rawQuery("SELECT version,fingerprint,length(embedding),decoded_width,decoded_height,error,elapsed_ms"+
                 (if(table=="visual_features") ",phash,length(layout)" else "")+" FROM $table WHERE photo_id=?",arrayOf(id.toString())).use { c ->
                 if(c.moveToFirst()) result.put(table,org.json.JSONObject().put("version",c.getString(0)).put("fingerprint",c.getString(1))
@@ -477,17 +476,17 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
         var total=PreparationStats()
         for((where,params) in parts) {
             val vr="v.error='' AND length(v.embedding)=5120"
-            val dr=if(BuildConfig.HAS_DESCRIPTION) "d.error='' AND length(d.embedding)=${DescriptionFeatures.BYTES}" else "1"
-            val description=if(BuildConfig.HAS_DESCRIPTION) "SUM(CASE WHEN $dr THEN 1 ELSE 0 END),SUM(CASE WHEN d.error<>'' THEN 1 ELSE 0 END)" else "0,0"
-            val descriptionJoin=if(BuildConfig.HAS_DESCRIPTION) "LEFT JOIN description_features d ON d.photo_id=photos._id AND d.fingerprint=photos.fingerprint AND d.version=?" else ""
-            val versions=if(BuildConfig.HAS_DESCRIPTION) arrayOf(VisualFeatures.VERSION,DescriptionFeatures.VERSION) else arrayOf(VisualFeatures.VERSION)
+            val dr="d.error='' AND length(d.embedding)=${DescriptionFeatures.BYTES}"
+            val versions=arrayOf(VisualFeatures.VERSION,DescriptionFeatures.VERSION)
             val tr="(state='empty' OR (state='done' AND semantic=1))"
             readableDatabase.rawQuery("""SELECT COUNT(*),SUM(CASE WHEN state IN ('done','empty') THEN 1 ELSE 0 END),SUM(CASE WHEN state='failed' THEN 1 ELSE 0 END),
                 SUM(CASE WHEN state='done' AND semantic=1 THEN 1 ELSE 0 END),SUM(CASE WHEN state='done' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN $vr THEN 1 ELSE 0 END),SUM(CASE WHEN v.error<>'' THEN 1 ELSE 0 END),$description,
+                SUM(CASE WHEN $vr THEN 1 ELSE 0 END),SUM(CASE WHEN v.error<>'' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN $dr THEN 1 ELSE 0 END),SUM(CASE WHEN d.error<>'' THEN 1 ELSE 0 END),
                 SUM(CASE WHEN $tr AND $vr AND ($dr) THEN 1 ELSE 0 END)
                 FROM photos LEFT JOIN visual_features v ON v.photo_id=photos._id AND v.fingerprint=photos.fingerprint AND v.version=?
-                $descriptionJoin WHERE $where""",versions+params).use { c ->
+                LEFT JOIN description_features d ON d.photo_id=photos._id AND d.fingerprint=photos.fingerprint AND d.version=?
+                WHERE $where""",versions+params).use { c ->
                 c.moveToFirst();total+=PreparationStats(c.getInt(0),c.getInt(1),c.getInt(2),c.getInt(3),c.getInt(4),c.getInt(5),c.getInt(6),c.getInt(7),c.getInt(8),c.getInt(9))
             }
         }

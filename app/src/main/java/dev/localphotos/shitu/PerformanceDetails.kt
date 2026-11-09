@@ -9,13 +9,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.localphotos.shitu.core.DescriptionFeatures
 import org.json.JSONObject
 import java.util.Locale
 
 internal fun traceModel(value:String)=when {
     value.startsWith("bge")->"BGE"
-    value.startsWith("cnclip-rn50")->"Chinese-CLIP RN50"
-    else->"Chinese-CLIP"
+    value.startsWith("cnclip-rn50")->DescriptionFeatures.MODEL_NAME
+    value.startsWith("cnclip-")->"旧画面模型"
+    else->value.ifBlank { "未记录" }
 }
 internal fun traceStatus(value:String)=when(value) { "running"->"进行中";"success"->"完成";"cancelled"->"已取消";"degraded"->"已降级";"failed"->"失败";else->value }
 internal fun elapsedLabel(ms:Long)=if(ms<1000) "$ms ms" else String.format(Locale.ROOT,"%.2f s",ms/1000.0)
@@ -66,8 +68,7 @@ internal fun elapsedLabel(ms:Long)=if(ms<1000) "$ms ms" else String.format(Local
                 QuietHeading("每个阶段最近 100 次处理")
                 val stages=data.optJSONObject("preparation_latency")?:JSONObject()
                 PerformanceLine("阶段","中位","P95",heading=true)
-                val stageLabels=listOf("ocr" to "识别文字","meaning" to "文字含义","similar" to "相近特征")+
-                    if(BuildConfig.HAS_DESCRIPTION) listOf("description" to "画面描述") else emptyList()
+                val stageLabels=listOf("ocr" to "识别文字","meaning" to "文字含义","similar" to "相近特征","description" to "画面描述")
                 for((key,label) in stageLabels) {
                     val row=stages.optJSONObject(key)?:JSONObject()
                     fun duration(name:String)=if(row.has(name) && !row.isNull(name)) elapsedLabel(row.optLong(name)) else "—"

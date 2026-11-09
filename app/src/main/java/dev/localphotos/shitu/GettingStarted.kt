@@ -27,21 +27,18 @@ private data class GuideStep(val topic: GuideTopic, val title: String, val scena
 @Composable
 internal fun GettingStarted(onClose: () -> Unit) {
     val steps = remember {
-        buildList {
-            add(GuideStep(GuideTopic.PREPARE, "先补全搜索信息", "想让图库里的图片能被搜到？",
-                "授权照片后，点首页的「补全信息」。可以先处理 100 张。"))
-            add(GuideStep(GuideTopic.EXCLUDE, "隐藏目录", "如果有不想被识别的目录，",
-                "点「设置 → 排除目录」，勾选要隐藏的目录。"))
-            add(GuideStep(GuideTopic.TEXT, "搜索文字", "记得图片里有的文字？图片的文件名？",
-                if (BuildConfig.HAS_DESCRIPTION) "在搜索框右侧选「文字」，输入记得的词。近义词也能找哦。"
-                else "直接在搜索框输入记得的词。近义词也能找哦。"))
-            add(GuideStep(GuideTopic.SIMILAR, "找相近", "手头有一张图片，想找类似的图片？",
-                "打开这张图片，点底部的「找相近」。"))
-            if (BuildConfig.HAS_DESCRIPTION) {
-                add(GuideStep(GuideTopic.SCENE, "描述画面", "记得图片的画面但是没有用来参考的图？",
-                    "那就描述出来。点搜索框右侧的下拉菜单，选「描述画面」，试试「一只橘猫」。"))
-            }
-        }
+        listOf(
+            GuideStep(GuideTopic.PREPARE, "先补全搜索信息", "想让图库里的图片能被搜到？",
+                "授权照片后，点首页的「补全信息」。可以先处理 100 张。"),
+            GuideStep(GuideTopic.EXCLUDE, "隐藏目录", "如果有不想被识别的目录，",
+                "点「设置 → 排除目录」，勾选要隐藏的目录。"),
+            GuideStep(GuideTopic.TEXT, "搜索文字", "记得图片里有的文字？图片的文件名？",
+                "在搜索框右侧选「文字」，输入记得的词。近义词也能找哦。"),
+            GuideStep(GuideTopic.SIMILAR, "找相近", "手头有一张图片，想找类似的图片？",
+                "打开这张图片，点底部的「找相近」。"),
+            GuideStep(GuideTopic.SCENE, "描述画面", "记得图片的画面但是没有用来参考的图？",
+                "那就描述出来。点搜索框右侧的下拉菜单，选「描述画面」，试试「一只橘猫」。"),
+        )
     }
     var index by rememberSaveable { mutableIntStateOf(0) }
     val step = steps[index]
@@ -112,10 +109,8 @@ private fun GuideHome(topic: GuideTopic) {
                 verticalAlignment = Alignment.CenterVertically) {
                 Icon(UiIcons.Search, null, Modifier.size(16.dp))
                 Text("搜截图里的字", Modifier.weight(1f).padding(start = 6.dp), style = MaterialTheme.typography.bodySmall)
-                if (BuildConfig.HAS_DESCRIPTION) {
-                    if (showMenu) GuideRing { PreviewLabel("文字", UiIcons.Down) }
-                    else PreviewLabel("文字", UiIcons.Down)
-                }
+                if (showMenu) GuideRing { PreviewLabel("文字", UiIcons.Down) }
+                else PreviewLabel("文字", UiIcons.Down)
             }
         }
         if (topic == GuideTopic.TEXT) GuideRing(content = searchField) else searchField()

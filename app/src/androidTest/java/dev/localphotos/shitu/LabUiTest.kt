@@ -73,9 +73,9 @@ class LabUiTest {
                 assertEquals("discovery",JSONObject(app.database.details(id)!!.matchDebug).getString("query"));shot("build12-technical.png")
                 click("detail_特征");click("detail_文字含义");compose.onNodeWithText("BGE-small-zh-v1.5 · INT8").assertExists()
                 click("detail_文字含义");click("detail_相近特征");compose.onNodeWithText("1280 维 · 5 KB").assertExists()
-                if(BuildConfig.HAS_DESCRIPTION) {
-                    click("detail_相近特征");click("detail_画面特征");compose.onNodeWithText(DescriptionFeatures.MODEL_LABEL).assertExists()
-                }
+                click("detail_相近特征");click("detail_画面特征")
+                compose.onNodeWithText(DescriptionFeatures.MODEL_LABEL).assertExists()
+                compose.onNodeWithText("1024 维").assertExists()
                 click("detail_OCR")
                 compose.onNodeWithText("检测推理").assertIsDisplayed()
                 compose.onNodeWithText("识别推理").assertIsDisplayed()

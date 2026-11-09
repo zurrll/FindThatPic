@@ -25,5 +25,4 @@ __pycache__/
 *.jks
 *.keystore
 
-app/src/standard/assets/models/*.onnx
-app/src/standard/assets/models/cnclip-vocab.txt
+app/src/main/assets/models/cnclip-vocab.txt

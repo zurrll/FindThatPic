@@ -56,27 +56,16 @@ class PreparationUiTest {
                 compose.waitUntil(100_000) { app.preparation.readJob()?.optBoolean("finished")==true && !vm.state.value.workActive }
                 assertEquals(fixed,app.preparation.readJob()!!.getJSONArray("ids").toString())
                 assertEquals(20,app.database.preparationStats(SearchOptions(folders=setOf(folder))).complete)
-                assertEquals(BuildConfig.HAS_DESCRIPTION,app.preparation.readJob()!!.getBoolean("description"))
-                if(!BuildConfig.HAS_DESCRIPTION) {
-                    assertEquals(0,app.database.preparationStats(SearchOptions(folders=setOf(folder))).description)
-                    compose.onNodeWithTag("searchModeMenu").assertDoesNotExist()
-                }
+                assertTrue(app.preparation.readJob()!!.getBoolean("description"))
                 assertEquals("保留旧文字记录",app.database.get(old.id)!!.text);assertEquals("legacy",app.database.details(old.id)!!.version)
                 assertTrue(app.database.pendingPreparationIds(100,SearchOptions(folders=setOf(folder)),PreparationKinds()).isEmpty())
                 compose.waitUntil(10_000) { vm.state.value.prepared.complete==20 };compose.waitForIdle()
                 val screen=instrument.uiAutomation.takeScreenshot()
                 java.io.File(app.getExternalFilesDir(null),"preparation-page.png").outputStream().use { screen.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) };screen.recycle()
                 compose.onNodeWithTag("sheetDone").performClick()
-                val reference=if(BuildConfig.HAS_DESCRIPTION) {
-                    click("searchModeMenu");click("searchModeDESCRIPTION");compose.onNodeWithTag("searchField").performTextReplacement("一只猫")
-                    compose.waitUntil(20_000) { !vm.state.value.searching && vm.state.value.hits.isNotEmpty() && vm.state.value.query=="一只猫" }
-                    vm.state.value.hits.first().photo.also { assertTrue(it.name,it.name.startsWith("cat")) }
-                } else {
-                    compose.onNodeWithTag("searchField").performTextReplacement("cat-1.png")
-                    val cat=photos.first { it.name=="cat-1.png" }
-                    compose.waitUntil(15_000) { !vm.state.value.searching && vm.state.value.hits.firstOrNull()?.photo?.id==cat.id }
-                    cat
-                }
+                click("searchModeMenu");click("searchModeDESCRIPTION");compose.onNodeWithTag("searchField").performTextReplacement("一只猫")
+                compose.waitUntil(20_000) { !vm.state.value.searching && vm.state.value.hits.isNotEmpty() && vm.state.value.query=="一只猫" }
+                val reference=vm.state.value.hits.first().photo.also { assertTrue(it.name,it.name.startsWith("cat")) }
                 click("photo_${reference.id}");click("findSimilar");click("visualScopeMenu");click("visualCurrentScope")
                 val candidates=app.visualSearch.find(reference.id,SearchOptions(folders=setOf(folder)))
                 assertTrue(candidates.isNotEmpty());val next=candidates.first().photo
@@ -87,7 +76,7 @@ class PreparationUiTest {
                 compose.waitUntil(15_000) { compose.onAllNodesWithTag("similarSeed").fetchSemanticsNodes().any { it.config.getOrElse(seedName) { "" }==next.name } }
                 click("similarBack");compose.onNodeWithTag("similarSeed").assert(SemanticsMatcher.expectValue(seedName,reference.name))
                 click("closeSimilar")
-                if(BuildConfig.HAS_DESCRIPTION) { click("searchModeMenu");click("searchModeTEXT") }
+                click("searchModeMenu");click("searchModeTEXT")
                 compose.onNodeWithTag("searchField").performTextReplacement("保留旧文字记录")
                 compose.waitUntil(15_000) { !vm.state.value.searching && vm.state.value.hits.firstOrNull()?.photo?.id==old.id }
                 click("librarySettings");click("openGuide")
@@ -96,9 +85,7 @@ class PreparationUiTest {
                 click("guideNext");compose.onNodeWithText("如果有不想被识别的目录，").assertIsDisplayed()
                 click("guideNext");compose.onNodeWithText("记得图片里有的文字？图片的文件名？").assertIsDisplayed()
                 click("guideNext");compose.onNodeWithText("手头有一张图片，想找类似的图片？").assertIsDisplayed()
-                if(BuildConfig.HAS_DESCRIPTION) {
-                    click("guideNext");compose.onNodeWithText("记得图片的画面但是没有用来参考的图？").assertIsDisplayed()
-                }
+                click("guideNext");compose.onNodeWithText("记得图片的画面但是没有用来参考的图？").assertIsDisplayed()
                 click("guideNext");compose.onNodeWithTag("gettingStarted").assertDoesNotExist()
                 click("librarySettings");click("settingsPrepare");click("sheetDone")
                 click("librarySettings");click("performanceReport")

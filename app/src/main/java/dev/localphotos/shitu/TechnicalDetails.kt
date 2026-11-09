@@ -77,7 +77,7 @@ import org.json.JSONObject
                         MetricRow("图片文字",stateLabel(p.state))
                         MetricRow("文字含义",if(p.semantic) "已准备 · ${passages.length()} 段" else if(p.state=="empty") "无文字" else "尚未准备")
                         MetricRow("相近图片",featureStatus(visual,p.fingerprint,VisualFeatures.VERSION,1280))
-                        if(BuildConfig.HAS_DESCRIPTION) MetricRow("画面描述",featureStatus(description,p.fingerprint,DescriptionFeatures.VERSION,DescriptionFeatures.DIMENSIONS))
+                        MetricRow("画面描述",featureStatus(description,p.fingerprint,DescriptionFeatures.VERSION,DescriptionFeatures.DIMENSIONS))
                         Disclosure("原始文件") {
                             InfoRow("目录",p.folder)
                             MetricRow("格式",p.mime.ifBlank { "未知" })
@@ -139,7 +139,8 @@ import org.json.JSONObject
                         QuietHeading("准备耗时")
                         MetricRow("文字含义 · BGE",if(f.has("meaningMs")) elapsedLabel(f.optLong("meaningMs")) else "—")
                         MetricRow("相近图片 · MobileNetV4",visual?.let { elapsedLabel(it.optLong("elapsedMs")) }.orEmpty())
-                        if(BuildConfig.HAS_DESCRIPTION) MetricRow("画面描述 · Chinese-CLIP",description?.let { elapsedLabel(it.optLong("elapsedMs")) }.orEmpty())
+                        val currentDescription=description?.takeIf { it.optString("version")==DescriptionFeatures.VERSION }
+                        MetricRow("画面描述 · RN50",currentDescription?.let { elapsedLabel(it.optLong("elapsedMs")) }?:"—")
                         Disclosure("文字含义",tag="detail_文字含义") {
                             MetricRow("模型","BGE-small-zh-v1.5 · INT8")
                             MetricRow("段落数",passages.length().toString())
@@ -159,7 +160,7 @@ import org.json.JSONObject
                             MetricRow("最多候选","40 张")
                             visual?.let { MetricRow("pHash",it.optString("phash"));MetricRow("布局缓存","${it.optInt("layoutBytes")} B") }
                         }
-                        if(BuildConfig.HAS_DESCRIPTION) Disclosure("画面特征",tag="detail_画面特征") {
+                        Disclosure("画面特征",tag="detail_画面特征") {
                             FeatureCard("画面描述特征",DescriptionFeatures.MODEL_LABEL,description,p.fingerprint,DescriptionFeatures.VERSION,DescriptionFeatures.DIMENSIONS)
                             MetricRow("图文向量","${DescriptionFeatures.DIMENSIONS} 维")
                             MetricRow("描述长度","最多 52 token")
@@ -210,7 +211,12 @@ internal fun featureStatus(value:JSONObject?,fingerprint:String,version:String,d
             fun score(key:String)=if(!value.has(key) || value.isNull(key)) "未计算" else String.format(java.util.Locale.ROOT,"%.4f",value.optDouble(key))
             when(kind) {
                 "visual"->{ InfoRow("匹配原因",value.optString("reason"));InfoRow("模型 / 布局","${score("cosine")} / ${score("appearance")}");InfoRow("排序分",score("rank"));InfoRow("指纹差异","${value.optInt("hashDistance")} / 63");InfoRow("扫描候选",value.optInt("scanned").toString()) }
-                "description"->{ InfoRow("画面相似度",score("similarity"));InfoRow("模型版本",value.optString("modelVersion")) }
+                "description"->{
+                    val model=value.optString("modelVersion")
+                    InfoRow("画面相似度",score("similarity"))
+                    InfoRow("模型",traceModel(model))
+                    InfoRow("模型版本",model)
+                }
                 else->{ InfoRow("匹配原因",value.optString("reason"));InfoRow("文字分",score("lexicalScore"));InfoRow("含义相似度",score("similarity"));if(value.optString("matchedText").isNotBlank()) SelectableValue(value.optString("matchedText")) }
             }
             Disclosure("完整匹配记录") { SelectableValue(value.toString(2),mono=true) }

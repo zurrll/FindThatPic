@@ -35,7 +35,7 @@ class PerformanceMonitor(private val context:Context) {
         val memory=ActivityManager.MemoryInfo()
         (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(memory)
         val preparation=JSONObject()
-        for(stage in listOf("ocr","meaning","similar")+if(BuildConfig.HAS_DESCRIPTION) listOf("description") else emptyList()) {
+        for(stage in listOf("ocr","meaning","similar","description")) {
             val times=prefs.getString(preparationKey(stage),"")!!.split(',').mapNotNull(String::toLongOrNull)
             val sorted=times.sorted()
             fun percentile(p:Double)=sorted.getOrNull(((sorted.size-1).coerceAtLeast(0)*p).toInt())?:JSONObject.NULL
@@ -50,7 +50,7 @@ class PerformanceMonitor(private val context:Context) {
             put("description_photos",prepared.description);put("failed",stats.failed);put("semantic_photos",stats.semantic);put("folder_count",stats.folders.size)
             put("peak_process_pss_kb",prefs.getInt("peak_pss_kb",0))
             put("preparation_latency",preparation);put("recent_searches",recent())
-            put("edition",BuildConfig.FLAVOR);put("available_bytes",context.noBackupFilesDir.usableSpace)
+            put("available_bytes",context.noBackupFilesDir.usableSpace)
             put("description_failed",prepared.descriptionFailed);put("similar_failed",prepared.similarFailed)
             put("emulator",Build.FINGERPRINT.contains("generic") || Build.MODEL.contains("sdk_gphone"))
             put("last_batch_count",prefs.getInt("last_batch_count",0));put("last_batch_elapsed_ms",prefs.getLong("last_batch_ms",0))

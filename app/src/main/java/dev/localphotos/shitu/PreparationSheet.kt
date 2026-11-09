@@ -73,7 +73,7 @@ import kotlinx.coroutines.withContext
                 PreparationOption("相近图片",stats.similar,stats.total,state.kinds.similar,"prepareSimilar",!state.workActive) {
                     vm.kinds(state.kinds.copy(similar=it))
                 }
-                if(BuildConfig.HAS_DESCRIPTION) PreparationOption("画面描述",stats.description,stats.total,state.kinds.description,"prepareDescription",!state.workActive) {
+                PreparationOption("画面描述",stats.description,stats.total,state.kinds.description,"prepareDescription",!state.workActive) {
                     vm.kinds(state.kinds.copy(description=it))
                 }
                 if(hasFailures) Disclosure("更多选项",tag="preparationOptions") {

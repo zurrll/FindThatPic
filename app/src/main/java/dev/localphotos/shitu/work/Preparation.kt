@@ -32,11 +32,10 @@ class Preparation(private val app:PhotoApp) {
             val manager=WorkManager.getInstance(app)
             if(manager.getWorkInfosForUniqueWork(WORK).get().any { !it.state.isFinished }) return@withLock
             require(kinds.stages.isNotEmpty()) { "请选择至少一种搜索信息" }
-            val effective=kinds.copy(description=kinds.description && BuildConfig.HAS_DESCRIPTION)
-            val ids=selected?.distinct()?.filter { app.database.isEligible(it) }?:app.database.pendingPreparationIds(limit,options,effective,retry)
+            val ids=selected?.distinct()?.filter { app.database.isEligible(it) }?:app.database.pendingPreparationIds(limit,options,kinds,retry)
             check(ids.isNotEmpty()) { "当前范围没有待补齐的信息" }
             write(JSONObject().put("formatVersion",1).put("token",java.util.UUID.randomUUID().toString()).put("finished",false)
-                .put("ids",JSONArray(ids)).put("text",kinds.text).put("similar",kinds.similar).put("description",effective.description).put("retry",retry))
+                .put("ids",JSONArray(ids)).put("text",kinds.text).put("similar",kinds.similar).put("description",kinds.description).put("retry",retry))
             // A new round replaces paused legacy rounds too; their completed caches remain valid.
             for((name,mutex) in listOf("current.json" to app.jobMutex,"visual.json" to app.visualJobMutex)) mutex.withLock {
                 val legacy=File(file.parentFile,name)
@@ -46,7 +45,7 @@ class Preparation(private val app:PhotoApp) {
                     temp.writeText(previous.toString());check(temp.renameTo(legacy))
                 }
             }
-            app.progress.value=IndexProgress(target=ids.size*effective.stages.size,phase="等待准备搜索信息")
+            app.progress.value=IndexProgress(target=ids.size*kinds.stages.size,phase="等待准备搜索信息")
             enqueue(manager)
         }
     }
@@ -91,7 +90,7 @@ class Preparation(private val app:PhotoApp) {
             }
         }
     }
-    fun kinds(job:JSONObject)=PreparationKinds(job.optBoolean("text",true),job.optBoolean("similar",true),BuildConfig.HAS_DESCRIPTION && job.optBoolean("description",true))
+    fun kinds(job:JSONObject)=PreparationKinds(job.optBoolean("text",true),job.optBoolean("similar",true),job.optBoolean("description",true))
     suspend fun finish(token:String)=app.preparationJobMutex.withLock {
         val job=readJob()?:return@withLock
         if(job.optString("token")==token) { job.put("finished",true);write(job) }
