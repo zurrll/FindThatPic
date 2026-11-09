@@ -1,1 +1,9 @@
-Chinese-CLIP, OFA-Sys. Upstream repository declares MIT; the weight model card does not separately declare a license. Official weights: OFA-Sys/chinese-clip-vit-base-patch16. ONNX conversion: Xenova/chinese-clip-vit-base-patch16, revision f26904860903e70e050b8f48255e5f48401816e9. Extracted image/text branches without changing weights. See description-model.lock.json in the FindThatPic source repository for provenance.
+Chinese-CLIP RN50 by the OFA-Sys Team.
+Original checkpoint: https://huggingface.co/OFA-Sys/chinese-clip-rn50
+Revision: 717ba215769231e53b9b7c6b9d329b9cc5944418
+The model weights are licensed under Apache License 2.0. The Chinese-CLIP
+software copyright and MIT notice are reproduced separately in CODE-LICENSE.
+
+FindThatPic exported separate image and text encoders to ONNX and quantized
+the weights and convolution activations. See description-model.lock.json in
+the FindThatPic source repository for checkpoint and asset provenance.

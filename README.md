@@ -27,17 +27,17 @@
 | 搜图片文字、近义词和文件名 | 支持 | 支持 |
 | 用一张图找相近 | 支持 | 支持 |
 | 用文字描述找画面 | — | 支持 |
-| ARM64 安装包约 | 77 MiB | 259 MiB |
+| ARM64 安装包约 | 77 MiB | 151 MiB（0.1.1 测试版） |
 
 两版的界面和基本操作相同。只搜截图文字、文件名或相近图片，轻量版就够用。普通版额外保存画面向量，补全画面信息也会花时间。
 
-轻量版 APK 在发布页。普通版可按下方步骤从源码构建。
+0.1.0 轻量版 APK 在发布页。0.1.1 普通版测试包使用 RN50，覆盖升级后只需补全画面描述。
 
 ## 大图库上的性能
 
 准备图片时按需解码，分阶段处理，支持暂停、继续和复用已有结果。首次补全的时间取决于图片数量和内容，字多、长图或需要补看的图片会更慢。
 
-一加 Ace 5 的使用反馈可供参考。
+一加 Ace 5 上的 0.1.0 使用反馈可供参考。
 
 - **准备信息**每张约 600～800 ms。普通版如果同时补全画面信息，每张再花约 250 ms。第一次准备大量图片时，这部分耗时会累积。
 - **单次搜索**通常一百多到两百多毫秒，文字含义搜索（BGE）和画面描述搜索（Chinese-CLIP）都在这个范围。
@@ -52,10 +52,10 @@
 
 ```sh
 python3 -m pip install -r scripts/model-requirements.txt
-python3 scripts/fetch_models.py --edition standard
+python3 scripts/fetch_models.py --edition standard --description-assets /path/to/rn50-assets
 ./gradlew :app:assembleLiteRelease :app:assembleStandardRelease
 ```
 
-只构建轻量版时，用 `--edition lite` 和 `:app:assembleLiteRelease`。APK 位于 `app/build/outputs/apk/<版本>/release/`。
+普通版测试构建需要 [画面模型清单](description-model.lock.json) 对应的 RN50 资产目录。已准备资产时可省略 `--description-assets`。只构建轻量版时，用 `--edition lite` 和 `:app:assembleLiteRelease`。APK 位于 `app/build/outputs/apk/<版本>/release/`。
 
 [开发与设计](docs/DEVELOPMENT.md) · [第三方许可](THIRD_PARTY_NOTICES.md) · [源码许可](LICENSE)

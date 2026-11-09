@@ -53,7 +53,7 @@ class LabUiTest {
                 """.trimIndent())
                 app.database.saveVectors(id,listOf(FloatArray(512).apply { this[0]=1f }),passages=listOf("费用明细"))
                 app.database.saveVisual(target,VisualFeatures(FloatArray(1280).apply { this[0]=1f },0,ByteArray(768),451,300),7)
-                app.database.saveDescription(target,DescriptionFeatures(FloatArray(512).apply { this[0]=1f },451,300),32)
+                app.database.saveDescription(target,DescriptionFeatures(FloatArray(DescriptionFeatures.DIMENSIONS).apply { this[0]=1f },451,300),32)
                 app.database.saveFeedback(id,"旧版说明需要保留","旧版查询", "{}")
                 val failed=vm.state.value.hits.first { it.photo.id!=id }.photo.id
                 app.database.fail(failed,"ocr_failed")
@@ -74,7 +74,7 @@ class LabUiTest {
                 click("detail_特征");click("detail_文字含义");compose.onNodeWithText("BGE-small-zh-v1.5 · INT8").assertExists()
                 click("detail_文字含义");click("detail_相近特征");compose.onNodeWithText("1280 维 · 5 KB").assertExists()
                 if(BuildConfig.HAS_DESCRIPTION) {
-                    click("detail_相近特征");click("detail_画面特征");compose.onNodeWithText("Chinese-CLIP B/16 · INT8").assertExists()
+                    click("detail_相近特征");click("detail_画面特征");compose.onNodeWithText(DescriptionFeatures.MODEL_LABEL).assertExists()
                 }
                 click("detail_OCR")
                 compose.onNodeWithText("检测推理").assertIsDisplayed()

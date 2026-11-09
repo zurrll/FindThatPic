@@ -77,7 +77,7 @@ import org.json.JSONObject
                         MetricRow("图片文字",stateLabel(p.state))
                         MetricRow("文字含义",if(p.semantic) "已准备 · ${passages.length()} 段" else if(p.state=="empty") "无文字" else "尚未准备")
                         MetricRow("相近图片",featureStatus(visual,p.fingerprint,VisualFeatures.VERSION,1280))
-                        if(BuildConfig.HAS_DESCRIPTION) MetricRow("画面描述",featureStatus(description,p.fingerprint,DescriptionFeatures.VERSION,512))
+                        if(BuildConfig.HAS_DESCRIPTION) MetricRow("画面描述",featureStatus(description,p.fingerprint,DescriptionFeatures.VERSION,DescriptionFeatures.DIMENSIONS))
                         Disclosure("原始文件") {
                             InfoRow("目录",p.folder)
                             MetricRow("格式",p.mime.ifBlank { "未知" })
@@ -160,8 +160,8 @@ import org.json.JSONObject
                             visual?.let { MetricRow("pHash",it.optString("phash"));MetricRow("布局缓存","${it.optInt("layoutBytes")} B") }
                         }
                         if(BuildConfig.HAS_DESCRIPTION) Disclosure("画面特征",tag="detail_画面特征") {
-                            FeatureCard("画面描述特征","Chinese-CLIP B/16 · INT8",description,p.fingerprint,DescriptionFeatures.VERSION,512)
-                            MetricRow("图文向量","512 维")
+                            FeatureCard("画面描述特征",DescriptionFeatures.MODEL_LABEL,description,p.fingerprint,DescriptionFeatures.VERSION,DescriptionFeatures.DIMENSIONS)
+                            MetricRow("图文向量","${DescriptionFeatures.DIMENSIONS} 维")
                             MetricRow("描述长度","最多 52 token")
                         }
                     }

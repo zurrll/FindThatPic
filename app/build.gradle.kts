@@ -10,8 +10,8 @@ android {
         applicationId = "dev.localphotos.shitu"
         minSdk = 29
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.1.0"
+        versionCode = 20
+        versionName = "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a") }
     }

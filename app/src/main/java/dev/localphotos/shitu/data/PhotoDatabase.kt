@@ -456,7 +456,7 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
         "ocr"->if(retry) "state IN ('pending','failed')" else "state='pending'"
         "meaning"->"state='done' AND semantic=0"
         "similar"->"NOT EXISTS (SELECT 1 FROM visual_features f WHERE f.photo_id=photos._id AND f.fingerprint=photos.fingerprint AND f.version='${VisualFeatures.VERSION}' AND ${if(retry) "f.error='' AND length(f.embedding)=5120" else "(f.error<>'' OR length(f.embedding)=5120)"})"
-        "description"->"NOT EXISTS (SELECT 1 FROM description_features f WHERE f.photo_id=photos._id AND f.fingerprint=photos.fingerprint AND f.version='${DescriptionFeatures.VERSION}' AND ${if(retry) "f.error='' AND length(f.embedding)=2048" else "(f.error<>'' OR length(f.embedding)=2048)"})"
+        "description"->"NOT EXISTS (SELECT 1 FROM description_features f WHERE f.photo_id=photos._id AND f.fingerprint=photos.fingerprint AND f.version='${DescriptionFeatures.VERSION}' AND ${if(retry) "f.error='' AND length(f.embedding)=${DescriptionFeatures.BYTES}" else "(f.error<>'' OR length(f.embedding)=${DescriptionFeatures.BYTES})"})"
         else->error("Unknown preparation stage")
     }
     fun pendingPreparationIds(limit:Int,options:SearchOptions,kinds:PreparationKinds,retry:Boolean=false):List<Long> {
@@ -477,7 +477,7 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
         var total=PreparationStats()
         for((where,params) in parts) {
             val vr="v.error='' AND length(v.embedding)=5120"
-            val dr=if(BuildConfig.HAS_DESCRIPTION) "d.error='' AND length(d.embedding)=2048" else "1"
+            val dr=if(BuildConfig.HAS_DESCRIPTION) "d.error='' AND length(d.embedding)=${DescriptionFeatures.BYTES}" else "1"
             val description=if(BuildConfig.HAS_DESCRIPTION) "SUM(CASE WHEN $dr THEN 1 ELSE 0 END),SUM(CASE WHEN d.error<>'' THEN 1 ELSE 0 END)" else "0,0"
             val descriptionJoin=if(BuildConfig.HAS_DESCRIPTION) "LEFT JOIN description_features d ON d.photo_id=photos._id AND d.fingerprint=photos.fingerprint AND d.version=?" else ""
             val versions=if(BuildConfig.HAS_DESCRIPTION) arrayOf(VisualFeatures.VERSION,DescriptionFeatures.VERSION) else arrayOf(VisualFeatures.VERSION)
@@ -495,10 +495,10 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
     }
     fun description(id:Long):DescriptionFeatures?=readableDatabase.rawQuery("""SELECT f.embedding,f.decoded_width,f.decoded_height FROM description_features f JOIN photos ON photos._id=f.photo_id
         WHERE _id=? AND $eligible AND f.version=? AND f.fingerprint=photos.fingerprint AND f.error=''""",arrayOf(id.toString(),DescriptionFeatures.VERSION)).use { c ->
-        if(c.moveToFirst() && c.getBlob(0).size==2048) DescriptionFeatures(TextTools.unpack(c.getBlob(0)),c.getInt(1),c.getInt(2)) else null
+        if(c.moveToFirst() && c.getBlob(0).size==DescriptionFeatures.BYTES) DescriptionFeatures(TextTools.unpack(c.getBlob(0)),c.getInt(1),c.getInt(2)) else null
     }
     fun saveDescription(photo:Photo,value:DescriptionFeatures?,elapsedMs:Long,error:String=""):Boolean {
-        if(value!=null) require(value.embedding.size==512 && value.embedding.all { it.isFinite() } && value.width>0 && value.height>0)
+        if(value!=null) require(value.embedding.size==DescriptionFeatures.DIMENSIONS && value.embedding.all { it.isFinite() } && value.width>0 && value.height>0)
         val db=writableDatabase;db.beginTransaction()
         try {
             if(!isEligible(photo.id) || get(photo.id,brief=true)?.fingerprint!=photo.fingerprint) { db.setTransactionSuccessful();return false }
@@ -510,7 +510,7 @@ class PhotoDatabase(context: Context, name: String = "photos.db") : SQLiteOpenHe
         val (where,args)=scope(null,0,filter,options)
         readableDatabase.rawQuery("""SELECT f.photo_id,f.embedding,photos.fingerprint FROM description_features f JOIN photos ON photos._id=f.photo_id
             WHERE $where AND f.version=? AND f.fingerprint=photos.fingerprint AND f.error=''""",args+DescriptionFeatures.VERSION).use { c ->
-            while(c.moveToNext()) { val value=c.getBlob(1);if(value.size==2048) visit(c.getLong(0),TextTools.unpack(value),c.getString(2)) }
+            while(c.moveToNext()) { val value=c.getBlob(1);if(value.size==DescriptionFeatures.BYTES) visit(c.getLong(0),TextTools.unpack(value),c.getString(2)) }
         }
     }
     fun get(id: Long,brief:Boolean=false): Photo? = readableDatabase.rawQuery("SELECT ${if(brief) columns.replace("ocr_text","substr(ocr_text,1,480) AS ocr_text") else columns} FROM photos WHERE _id=?",arrayOf(id.toString())).use { if(it.moveToFirst()) photo(it) else null }

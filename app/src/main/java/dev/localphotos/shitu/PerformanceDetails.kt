@@ -12,7 +12,11 @@ import androidx.compose.ui.unit.dp
 import org.json.JSONObject
 import java.util.Locale
 
-internal fun traceModel(value:String)=when { value.startsWith("bge")->"BGE";else->"Chinese-CLIP" }
+internal fun traceModel(value:String)=when {
+    value.startsWith("bge")->"BGE"
+    value.startsWith("cnclip-rn50")->"Chinese-CLIP RN50"
+    else->"Chinese-CLIP"
+}
 internal fun traceStatus(value:String)=when(value) { "running"->"进行中";"success"->"完成";"cancelled"->"已取消";"degraded"->"已降级";"failed"->"失败";else->value }
 internal fun elapsedLabel(ms:Long)=if(ms<1000) "$ms ms" else String.format(Locale.ROOT,"%.2f s",ms/1000.0)
 @Composable internal fun SearchTraceCard(data:JSONObject) {

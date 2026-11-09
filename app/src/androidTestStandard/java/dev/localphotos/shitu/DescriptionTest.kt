@@ -15,7 +15,7 @@ class DescriptionTest {
     private val instrument=InstrumentationRegistry.getInstrumentation()
     private val app=instrument.targetContext.applicationContext as PhotoApp
     private fun photo(i:Int)=Photo(key="description-$i",uri="file:///never-decode-$i",name="$i.png",folder="Pictures/Description/",modified=1,size=1,width=224,height=224,added=i.toLong())
-    private fun feature(axis:Int=0)=DescriptionFeatures(FloatArray(512).apply { this[axis]=1f },224,224)
+    private fun feature(axis:Int=0)=DescriptionFeatures(FloatArray(DescriptionFeatures.DIMENSIONS).apply { this[axis]=1f },224,224)
     @Test fun schemaSevenUpgradeKeepsExistingDataAndMissingStagesStayIndependent() {
         val name="description-migration.db";app.deleteDatabase(name)
         var db=PhotoDatabase(app,name);db.upsertBatch((1..4).map(::photo),1);val images=db.recent(null,0,10).sortedBy { it.added };val p=images[0]
@@ -39,6 +39,34 @@ class DescriptionTest {
             db.setFolderExcluded("Pictures/Description/",true);assertEquals(0,db.preparationStats().total)
             assertTrue(db.pendingPreparationIds(100,SearchOptions(),PreparationKinds()).isEmpty())
         } finally { db.close();app.deleteDatabase(name) }
+    }
+    @Test fun upgradingFromB16OnlyRequeuesTheDescriptionFeature() {
+        val name="description-rn50-upgrade.db";app.deleteDatabase(name)
+        PhotoDatabase(app,name).use { db ->
+            db.upsertBatch(listOf(photo(1)),1)
+            val photo=db.recent(null,0,1).single()
+            val ids=listOf(photo.id)
+            db.complete(photo.id,"保留原文字","[]",3)
+            db.saveVectors(photo.id,listOf(FloatArray(512).apply { this[0]=1f }))
+            db.saveVisual(photo,VisualFeatures(FloatArray(1280).apply { this[0]=1f },0,ByteArray(768),224,224),1)
+            db.writableDatabase.execSQL("INSERT INTO description_features VALUES (?,?,?,?,?,?,?,?)",
+                arrayOf(photo.id,photo.fingerprint,"cnclip-f269048:q8:fit224-bicubic:bert52-lower:512-v1",
+                    TextTools.pack(FloatArray(512).apply { this[0]=1f }),224,224,"",5))
+
+            val old=db.preparationStats()
+            assertEquals(1,old.ocr);assertEquals(1,old.meaning);assertEquals(1,old.similar)
+            assertEquals(0,old.description);assertEquals(0,old.complete)
+            assertNull(db.description(photo.id))
+            db.eachDescription(SearchOptions(),PhotoFilter.ALL) { _,_,_ -> fail("Old vector must not participate in RN50 search") }
+            for(stage in listOf("ocr","meaning","similar")) assertTrue(db.pendingPreparationStage(ids,stage,false).isEmpty())
+            assertEquals(ids.toSet(),db.pendingPreparationStage(ids,"description",false))
+
+            assertTrue(db.saveDescription(photo,feature(),2))
+            assertEquals(DescriptionFeatures.DIMENSIONS,db.description(photo.id)?.embedding?.size)
+            assertEquals(1,db.preparationStats().complete)
+            assertTrue(db.pendingPreparationStage(ids,"description",false).isEmpty())
+        }
+        app.deleteDatabase(name)
     }
     @Test fun tenThousandDescriptionVectorsRespectFiltersAndNeedNoImageDecode()=runBlocking<Unit> {
         val name="description-scale.db";app.deleteDatabase(name)
@@ -77,13 +105,13 @@ class DescriptionTest {
                 val row=images.getJSONObject(i);val file=File(folder,row.getString("name"))
                 instrument.context.assets.open("visual/${file.name}").use { input ->file.outputStream().use(input::copyTo) }
                 val value=encoder.image(Uri.fromFile(file));features+=value;val expected=row.getJSONArray("embedding")
-                val score=TextTools.dot(FloatArray(512) { expected.getDouble(it).toFloat() },value.embedding)
+                val score=TextTools.dot(FloatArray(DescriptionFeatures.DIMENSIONS) { expected.getDouble(it).toFloat() },value.embedding)
                 assertTrue("image parity $score",score>0.9999f)
             }
             val texts=reference.getJSONArray("texts")
             for(i in 0 until texts.length()) {
                 val row=texts.getJSONObject(i);val value=encoder.text(row.getString("text"));val expected=row.getJSONArray("embedding")
-                val score=TextTools.dot(FloatArray(512) { expected.getDouble(it).toFloat() },value)
+                val score=TextTools.dot(FloatArray(DescriptionFeatures.DIMENSIONS) { expected.getDouble(it).toFloat() },value)
                 assertTrue("text parity $score",score>0.9999f)
             }
             val cat=encoder.text("一只猫");assertTrue(TextTools.dot(cat,features[1].embedding)>TextTools.dot(cat,features[0].embedding))

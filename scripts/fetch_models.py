@@ -33,39 +33,39 @@ def prepare_ocr_charset(spec, destination):
     print(f"Prepared and verified {target.name}")
 
 
-def fetch_description(destination):
+def fetch_description(destination, source):
     spec = json.loads((ROOT / "description-model.lock.json").read_text())
-    destination.mkdir(parents=True, exist_ok=True)
-    mapping = [(spec["visionFile"], "cnclip-image-int8.onnx"), (spec["textFile"], "cnclip-text-int8.onnx"), ("vocab.txt", "cnclip-vocab.txt")]
-    def metadata(name):
-        return spec.get("derivedFiles", {}).get(name) or spec["files"][name]
-    if all((destination / dst).exists() and hashlib.sha256((destination / dst).read_bytes()).hexdigest() == metadata(src)["sha256"] for src, dst in mapping):
-        print("Verified Chinese-CLIP assets")
+    def matches(path, item):
+        return path.is_file() and path.stat().st_size == item["bytes"] and hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
+
+    files = spec["files"]
+    if all(matches(destination / name, item) for name, item in files.items()):
+        print("Verified Chinese-CLIP RN50 assets")
         return
-    with tempfile.TemporaryDirectory() as folder:
-        temporary = Path(folder)
-        for src, dst in mapping:
-            if src == "vocab.txt":
-                with urllib.request.urlopen(f"https://huggingface.co/{spec['repository']}/resolve/{spec['revision']}/{src}", timeout=120) as response:
-                    (destination / dst).write_bytes(response.read())
-            else:
-                import onnx
-                source = temporary / "source.onnx"
-                if not source.exists():
-                    with urllib.request.urlopen(f"https://huggingface.co/{spec['repository']}/resolve/{spec['revision']}/onnx/model_quantized.onnx", timeout=180) as response, source.open("wb") as out:
-                        shutil.copyfileobj(response, out)
-                    if hashlib.sha256(source.read_bytes()).hexdigest() != spec["files"]["onnx/model_quantized.onnx"]["sha256"]:
-                        raise SystemExit("Chinese-CLIP source checksum mismatch")
-                image = src == spec["visionFile"]
-                onnx.utils.extract_model(str(source), str(destination / dst), ["pixel_values"] if image else ["input_ids", "attention_mask"], ["image_embeds"] if image else ["text_embeds"])
-            if hashlib.sha256((destination / dst).read_bytes()).hexdigest() != metadata(src)["sha256"]:
-                raise SystemExit("Chinese-CLIP asset checksum mismatch")
+    if source is None:
+        raise SystemExit("Provide the RN50 test assets with --description-assets <directory>.")
+    destination.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=destination.parent) as folder:
+        staging = Path(folder)
+        for name, item in files.items():
+            path = source / name
+            if not path.is_file():
+                raise SystemExit(f"Missing Chinese-CLIP RN50 asset: {path}")
+            shutil.copyfile(path, staging / name)
+            if not matches(staging / name, item):
+                raise SystemExit(f"Chinese-CLIP RN50 asset checksum mismatch: {name}")
+        for name in files:
+            (staging / name).replace(destination / name)
+    print("Installed and verified Chinese-CLIP RN50 assets")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--edition", choices=("lite", "standard"), default="standard")
-    edition = parser.parse_args().edition
+    parser.add_argument("--description-assets", type=Path, help="directory with the prepared RN50 ONNX assets")
+    args = parser.parse_args()
+    if args.edition == "standard":
+        fetch_description(ROOT / "app/src/standard/assets/models", args.description_assets)
     manifest = json.loads(MANIFEST.read_text())
     destination = ROOT / "app/src/main/assets/models"
     destination.mkdir(parents=True, exist_ok=True)
@@ -91,8 +91,6 @@ def main():
     target = destination / visual["name"]
     if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == visual.get("asset_sha256"):
         print(f"Verified {target.name}")
-        if edition == "standard":
-            fetch_description(ROOT / "app/src/standard/assets/models")
         return
     try:
         import onnx
@@ -111,8 +109,6 @@ def main():
             raise SystemExit("Visual model extraction mismatch; use pinned onnx version")
         target.write_bytes(extracted.read_bytes())
         print(f"Extracted and verified {target.name}")
-    if edition == "standard":
-        fetch_description(ROOT / "app/src/standard/assets/models")
 
 
 if __name__ == "__main__":

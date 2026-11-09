@@ -2,8 +2,10 @@ package dev.localphotos.shitu.core
 
 data class DescriptionFeatures(val embedding:FloatArray,val width:Int,val height:Int) {
     companion object {
-        const val DIMENSIONS=512
-        const val VERSION="cnclip-f269048:q8:fit224-bicubic:bert52-lower:512-v1"
+        const val DIMENSIONS=1024
+        const val BYTES=DIMENSIONS*4
+        const val MODEL_LABEL="Chinese-CLIP RN50 · INT8"
+        const val VERSION="cnclip-rn50-717ba21:q8:fit224-bicubic:bert52-lower:1024-v1"
     }
 }
 

@@ -41,7 +41,7 @@ class DescriptionEmbedder(private val context:Context) {
                 val input=FloatArray(3*224*224);val mean=floatArrayOf(.48145466f,.4578275f,.40821073f);val std=floatArrayOf(.26862954f,.26130258f,.27577711f)
                 for(i in pixels.indices) for(c in 0..2) input[c*pixels.size+i]=(((pixels[i] ushr (16-8*c)) and 255)*(1f/255f)-mean[c])/std[c]
                 currentCoroutineContext().ensureActive()
-                val active=imageSession?:load("cnclip-image-int8.onnx","e1208d2e").also { imageSession=it }
+                val active=imageSession?:load("cnclip-rn50-image-int8.onnx","2b8a8f03","e1208d2e-cnclip-image-int8.onnx").also { imageSession=it }
                 val vector=OnnxTensor.createTensor(env,FloatBuffer.wrap(input),longArrayOf(1,3,224,224)).use { tensor ->
                     active.run(mapOf("pixel_values" to tensor)).use { result -> read(result[0] as OnnxTensor) }
                 }
@@ -58,7 +58,10 @@ class DescriptionEmbedder(private val context:Context) {
             trace?.elapsed("model_wait",SystemClock.elapsedRealtime()-waiting)
             currentCoroutineContext().ensureActive()
             trace?.put("model_was_loaded",textSession!=null)
-            val active=textSession?:if(trace!=null) trace.stage("model_load") { load("cnclip-text-int8.onnx","5daf248e").also { textSession=it } } else load("cnclip-text-int8.onnx","5daf248e").also { textSession=it }
+            val active=textSession?:run {
+                val loadText={ load("cnclip-rn50-text-int8.onnx","0cc0996b","5daf248e-cnclip-text-int8.onnx") }
+                (trace?.stage("model_load") { loadText() }?:loadText()).also { textSession=it }
+            }
             val encoding=SystemClock.elapsedRealtime()
             val tokens=tokenizer.encode(query,52);val ids=LongArray(52);tokens.copyInto(ids)
             val mask=LongArray(52) { if(it<tokens.size) 1 else 0 }
@@ -73,13 +76,15 @@ class DescriptionEmbedder(private val context:Context) {
         result
     }
     private fun read(output:OnnxTensor):FloatArray {
-        check(output.info.shape.contentEquals(longArrayOf(1,512))) { "画面描述模型输出不兼容" }
-        val vector=FloatArray(512);output.floatBuffer.get(vector)
+        check(output.info.shape.contentEquals(longArrayOf(1,DescriptionFeatures.DIMENSIONS.toLong()))) { "画面描述模型输出不兼容" }
+        val vector=FloatArray(DescriptionFeatures.DIMENSIONS);output.floatBuffer.get(vector)
         check(vector.all { it.isFinite() } && vector.any { it!=0f }) { "画面描述特征无效" }
         return TextTools.unit(vector)
     }
-    private fun load(name:String,revision:String):OrtSession {
-        val target=File(context.noBackupFilesDir,"models/$revision-$name")
+    private fun load(name:String,revision:String,obsolete:String):OrtSession {
+        val folder=File(context.noBackupFilesDir,"models")
+        File(folder,obsolete).delete()
+        val target=File(folder,"$revision-$name")
         if(!target.exists()) {
             target.parentFile!!.mkdirs();val temp=File(target.parentFile,"$revision.tmp")
             context.assets.open("models/$name").use { input -> temp.outputStream().use(input::copyTo) }
