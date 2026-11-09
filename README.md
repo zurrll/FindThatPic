@@ -4,7 +4,7 @@
 
 拾图完全离线运行，应用无联网权限，原图只读。
 
-Android 10+ · ARM64 · 安装包约 151 MiB
+[下载 0.1.1](https://github.com/zurrll/FindThatPic/releases/tag/v0.1.1) · Android 10+ · ARM64 · 安装包约 151 MiB
 
 ## 你想找哪一张？
 
@@ -30,14 +30,15 @@ Android 10+ · ARM64 · 安装包约 151 MiB
 
 ## 从源码构建
 
-需要 JDK 17、Android SDK 36、Build Tools 35.0.0 和 Python 3.9+。设置 `ANDROID_HOME`，或在 `local.properties` 里填写 `sdk.dir`。
+需要 JDK 17、Android SDK 36、Build Tools 35.0.0 和 Python 3.9+。设置 `ANDROID_HOME`，或在 `local.properties` 里填写 `sdk.dir`。下载上面的 APK 到项目目录，从包中提取已量化的 RN50 资产。
 
 ```sh
 python3 -m pip install -r scripts/model-requirements.txt
-python3 scripts/fetch_models.py --description-assets /path/to/rn50-assets
+unzip -j FindThatPic-0.1.1-arm64.apk 'assets/models/cnclip-*' -d rn50-assets
+python3 scripts/fetch_models.py --description-assets rn50-assets
 ./gradlew :app:assembleRelease
 ```
 
-构建需要 [画面模型清单](description-model.lock.json) 对应的 RN50 资产目录。已准备资产时可省略 `--description-assets`。APK 位于 `app/build/outputs/apk/release/`。
+脚本按 [画面模型清单](description-model.lock.json) 校验提取的文件。已准备模型时可省略提取步骤和 `--description-assets`。构建产物位于 `app/build/outputs/apk/release/`。
 
 [开发与设计](docs/DEVELOPMENT.md) · [第三方许可](THIRD_PARTY_NOTICES.md) · [源码许可](LICENSE)
