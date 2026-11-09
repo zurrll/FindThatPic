@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -63,7 +64,7 @@ internal object UiIcons {
     }
 }
 @Composable internal fun PageHeader(title:String,onBack:()->Unit,tag:String="sheetDone",action:(@Composable RowScope.()->Unit)?=null) {
-    Row(Modifier.fillMaxWidth().heightIn(min=64.dp).padding(end=16.dp),verticalAlignment=Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().heightIn(min=52.dp).padding(end=12.dp),verticalAlignment=Alignment.CenterVertically) {
         IconButton(onClick=onBack,modifier=Modifier.testTag(tag)) { Icon(UiIcons.Back,"返回") }
         Text(title,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
         action?.invoke(this)
@@ -86,6 +87,23 @@ internal object UiIcons {
         }
     }
 }
+@Composable internal fun QuietHeading(text:String) {
+    Text(text,style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier=Modifier.padding(top=8.dp,bottom=4.dp))
+}
+
+@Composable internal fun MetricRow(label:String,value:String) {
+    Column {
+        Row(Modifier.fillMaxWidth().padding(vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp),
+            verticalAlignment=Alignment.CenterVertically) {
+            Text(label,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
+            Text(value.ifBlank { "—" },Modifier.weight(1f),textAlign=TextAlign.End,style=MaterialTheme.typography.bodyMedium,
+                color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        HorizontalDivider()
+    }
+}
+
 internal fun fileSize(bytes:Long):String=when {
     bytes>=1024L*1024*1024 -> String.format(java.util.Locale.ROOT,"%.1f GB",bytes/1073741824.0)
     bytes>=1024*1024 -> String.format(java.util.Locale.ROOT,"%.1f MB",bytes/1048576.0)

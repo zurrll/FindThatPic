@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -17,118 +18,163 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.localphotos.shitu.core.*
 import org.json.JSONArray
 import org.json.JSONObject
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun TechnicalDetails(vm:PhotoViewModel,data:InspectorData,onBack:()->Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val d=data.detail;val p=d.photo;val f=data.features
+    val d=data.detail
+    val p=d.photo
+    val f=data.features
     val ocr=remember(d.debug) { runCatching { JSONObject(d.debug) }.getOrDefault(JSONObject()) }
-    val visual=f.optJSONObject("visual_features");val description=f.optJSONObject("description_features")
+    val visual=f.optJSONObject("visual_features")
+    val description=f.optJSONObject("description_features")
     val passages=f.optJSONArray("passages")?:JSONArray()
-    var tab by remember(p.id) { mutableStateOf("概览") };var copied by remember { mutableStateOf(false) }
+    var tab by remember(p.id) { mutableStateOf("概览") }
+    var more by remember { mutableStateOf(false) }
     val context=LocalContext.current
-    val report=remember(data) { JSONObject().put("photo",JSONObject().put("id",p.id).put("name",p.name).put("folder",p.folder).put("uri",p.uri).put("width",p.width).put("height",p.height).put("bytes",p.size).put("added",p.added).put("taken",p.taken).put("fingerprint",p.fingerprint))
-        .put("ocr",ocr).put("ocrVersion",d.version).put("ocrMs",d.ocrMs).put("ocrText",p.text).put("searchVariants",d.variants).put("previousText",d.previousText).put("features",f).put("match",data.match).toString(2) }
+    val tabs=listOf("概览","OCR","特征","匹配")
+
     Column(Modifier.fillMaxSize()) {
-        PageHeader("技术详情",onBack,tag="closeTechnical",action={TextButton(onClick={copyText(context,"图片诊断",report);copied=true},modifier=Modifier.testTag("copyDiagnostics")) { Text(if(copied) "已复制" else "复制诊断") }})
-        val tabs=listOf("概览","OCR","文字含义","相近特征")+if(BuildConfig.HAS_DESCRIPTION) listOf("画面特征") else emptyList()
-        ScrollableTabRow(selectedTabIndex=tabs.indexOf(tab),edgePadding=16.dp,containerColor=MaterialTheme.colorScheme.background) {
-            tabs.forEach { title ->Tab(selected=tab==title,onClick={tab=title},text={Text(title)},modifier=Modifier.testTag("detail_$title")) }
-        }
-        key(tab) { Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp).testTag("technicalContent"),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-            when(tab) {
-                "概览"->{
-                    SectionCard {
-                        Text("搜索信息",style=MaterialTheme.typography.titleMedium)
-                        InfoRow("图片文字",stateLabel(p.state))
-                        InfoRow("文字含义",if(p.semantic) "已准备 · ${passages.length()} 段" else if(p.state=="empty") "无文字，无需计算" else "尚未准备")
-                        InfoRow("相近图片",featureStatus(visual,p.fingerprint,VisualFeatures.VERSION,1280))
-                        if(BuildConfig.HAS_DESCRIPTION) InfoRow("画面描述",featureStatus(description,p.fingerprint,DescriptionFeatures.VERSION,512))
-                    }
-                    MatchCard(data.match,d.query)
-                    data.match.optJSONObject("search")?.let { SearchTraceCard(it) }
-                    SectionCard {
-                        Text("原始文件",style=MaterialTheme.typography.titleMedium)
-                        InfoRow("名称",p.name);InfoRow("目录",p.folder);InfoRow("格式",p.mime.ifBlank { "未知" })
-                        InfoRow("尺寸","${p.width} × ${p.height}");InfoRow("文件大小",fileSize(p.size))
-                        InfoRow("存入时间",dateLabel(p.added,"未知"));InfoRow("拍摄时间",dateLabel(p.taken,"未提供"))
-                        Disclosure("内部标识") { InfoRow("媒体 ID",p.id.toString());InfoRow("URI",p.uri);InfoRow("内容指纹",p.fingerprint) }
-                    }
-                    if(p.reviewNote.isNotBlank()) SectionCard { Text("旧版保存的说明",style=MaterialTheme.typography.titleMedium);SelectableValue(p.reviewNote) }
+        PageHeader("技术详情",onBack,tag="closeTechnical") {
+            Box {
+                IconButton(onClick={more=true},modifier=Modifier.testTag("technicalMore")) { Icon(UiIcons.More,"更多操作") }
+                DropdownMenu(more,onDismissRequest={more=false}) {
+                    DropdownMenuItem(text={Text("复制诊断")},onClick={
+                        more=false
+                        val photo=JSONObject().put("id",p.id).put("name",p.name).put("folder",p.folder).put("uri",p.uri)
+                            .put("width",p.width).put("height",p.height).put("bytes",p.size).put("added",p.added).put("taken",p.taken).put("fingerprint",p.fingerprint)
+                        val report=JSONObject().put("photo",photo).put("ocr",ocr).put("ocrVersion",d.version).put("ocrMs",d.ocrMs)
+                            .put("ocrText",p.text).put("searchVariants",d.variants).put("previousText",d.previousText).put("features",f).put("match",data.match)
+                        copyText(context,"图片诊断",report.toString(2))
+                    },modifier=Modifier.testTag("copyDiagnostics"))
+                    if(tab=="OCR") DropdownMenuItem(text={Text("重新识别文字")},onClick={more=false;vm.rerun(listOf(p.id))},
+                        enabled=!state.workActive,modifier=Modifier.testTag("rerunOne"))
                 }
-                "OCR"->{
-                    OcrOverlay(data,ocr)
-                    SectionCard {
-                        Text("识别记录",style=MaterialTheme.typography.titleMedium)
-                        InfoRow("状态",stateLabel(p.state));InfoRow("引擎",OcrEngine.engineLabel(d.version))
-                        InfoRow("处理版本",d.version);InfoRow("总耗时","${d.ocrMs} ms")
-                        InfoRow("处理输入","${ocr.optJSONArray("tiles")?.length()?:0} 次 · 基础 ${ocr.optInt("baseCount")} / 补看 ${ocr.optInt("refinementCount")}")
-                        InfoRow("文字行","${ocr.optInt("rawLineCount")} → ${ocr.optInt("mergedLineCount")}")
-                        if(p.error.isNotBlank()) InfoRow("错误",p.error)
-                        Disclosure("处理参数") { InfoRow("策略",ocr.optString("strategy","旧记录未提供"));InfoRow("EXIF 方向",ocr.optInt("orientation",1).toString());InfoRow("识别坐标尺寸","${ocr.optInt("uprightWidth",p.width)} × ${ocr.optInt("uprightHeight",p.height)}") }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=5.dp),horizontalArrangement=Arrangement.spacedBy(9.dp),
+            verticalAlignment=Alignment.CenterVertically) {
+            PhotoImage(p,Modifier.size(36.dp),size=96)
+            Column(Modifier.weight(1f)) {
+                Text(p.name,style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                Text("${p.width} × ${p.height}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        SecondaryTabRow(selectedTabIndex=tabs.indexOf(tab),containerColor=MaterialTheme.colorScheme.background) {
+            tabs.forEach { title -> Tab(selected=tab==title,onClick={tab=title},text={Text(title)},modifier=Modifier.testTag("detail_$title")) }
+        }
+        key(tab) {
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=18.dp,vertical=10.dp)
+                .testTag("technicalContent"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                when(tab) {
+                    "概览" -> {
+                        QuietHeading("搜索信息")
+                        MetricRow("图片文字",stateLabel(p.state))
+                        MetricRow("文字含义",if(p.semantic) "已准备 · ${passages.length()} 段" else if(p.state=="empty") "无文字" else "尚未准备")
+                        MetricRow("相近图片",featureStatus(visual,p.fingerprint,VisualFeatures.VERSION,1280))
+                        if(BuildConfig.HAS_DESCRIPTION) MetricRow("画面描述",featureStatus(description,p.fingerprint,DescriptionFeatures.VERSION,512))
+                        Disclosure("原始文件") {
+                            InfoRow("目录",p.folder)
+                            MetricRow("格式",p.mime.ifBlank { "未知" })
+                            MetricRow("文件大小",fileSize(p.size))
+                            MetricRow("存入时间",dateLabel(p.added,"未知"))
+                            MetricRow("拍摄时间",dateLabel(p.taken,"未提供"))
+                            Disclosure("内部标识") { InfoRow("媒体 ID",p.id.toString());InfoRow("URI",p.uri);InfoRow("内容指纹",p.fingerprint) }
+                        }
+                        if(p.reviewNote.isNotBlank()) Disclosure("旧版保存的说明") { SelectableValue(p.reviewNote) }
                     }
-                    ocr.optJSONObject("timings")?.let { time ->
-                        Disclosure("识别耗时明细") {
-                            SectionCard {
-                                OcrTimingsCard(time, ocr.optLong("mergeMs"))
+                    "OCR" -> {
+                        val timings=ocr.optJSONObject("timings")
+                        val tiles=ocr.optJSONArray("tiles")?:JSONArray()
+                        val count=tiles.length()
+                        QuietHeading("OCR 总耗时")
+                        Text(if(p.state=="done" || p.state=="empty") elapsedLabel(d.ocrMs) else stateLabel(p.state),
+                            style=MaterialTheme.typography.headlineMedium)
+                        val stats=buildList {
+                            if(count>0) add("$count 块")
+                            if(ocr.optInt("refinementCount")>0) add("补看 ${ocr.optInt("refinementCount")} 次")
+                            if(timings?.has("boxCount")==true) add("${timings.optInt("boxCount")} 个文字框")
+                            if(timings?.has("recognitionCalls")==true) add("${timings.optInt("recognitionCalls")} 次识别")
+                        }
+                        if(stats.isNotEmpty()) Text(stats.joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        HorizontalDivider()
+                        if(timings!=null) {
+                            QuietHeading("各步骤耗时")
+                            OcrTimingsCard(timings,if(ocr.has("mergeMs")) ocr.optLong("mergeMs") else null)
+                        } else Text("这张图暂无分段计时。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Disclosure(if(count==0) "逐块耗时与输入尺寸" else "逐块耗时 · $count 块") {
+                            if(count==0) Text("暂无分块记录")
+                            for(i in 0 until count) {
+                                val t=tiles.optJSONObject(i)?:continue
+                                QuietHeading("第 ${i+1} 块 · ${t.optString("reason","识别输入")}")
+                                MetricRow("解码",elapsedLabel(t.optLong("decodeMs")))
+                                MetricRow("识别流程",elapsedLabel(t.optLong("ocrMs")))
+                                MetricRow("输入像素","${t.optInt("decodedWidth")} × ${t.optInt("decodedHeight")}")
+                                MetricRow("采样倍率",t.optInt("sampleSize",1).toString())
+                                t.optJSONObject("timings")?.let { OcrTimingsCard(it) }
+                            }
+                        }
+                        Disclosure("识别位置",tag="openOcrOverlay") { OcrOverlay(data,ocr) }
+                        Disclosure("识别原文与处理参数") {
+                            MetricRow("引擎",OcrEngine.engineLabel(d.version))
+                            InfoRow("处理版本",d.version)
+                            if(p.error.isNotBlank()) InfoRow("错误",p.error)
+                            MetricRow("EXIF 方向",ocr.optInt("orientation",1).toString())
+                            MetricRow("文字行","${ocr.optInt("rawLineCount")} → ${ocr.optInt("mergedLineCount")}")
+                            QuietHeading("识别文字 · ${p.text.length} 字符")
+                            SelectableValue(p.text)
+                            Disclosure("逐块原始输出与历史") {
+                                SelectableValue(ocr.optString("rawText",p.text))
+                                if(d.variants.isNotBlank()) { QuietHeading("检索变体");SelectableValue(d.variants) }
+                                if(d.previousText.isNotBlank()) { QuietHeading("上次识别结果");SelectableValue(d.previousText) }
                             }
                         }
                     }
-                    SectionCard { Text("识别文字 · ${p.text.length} 字符",style=MaterialTheme.typography.titleMedium);SelectableValue(p.text.ifBlank { "暂无文字" }) }
-                    Disclosure("逐块耗时与输入尺寸") {
-                        val tiles=ocr.optJSONArray("tiles")?:JSONArray()
-                        for(i in 0 until tiles.length()) {
-                            val t=tiles.getJSONObject(i)
-                            SectionCard { Text("输入 ${i+1} · ${t.optString("reason","识别输入")}",style=MaterialTheme.typography.titleSmall)
-                                InfoRow("解码 / 识别","${t.optLong("decodeMs")} / ${t.optLong("ocrMs")} ms")
-                                InfoRow("输入像素","${t.optInt("decodedWidth")} × ${t.optInt("decodedHeight")}");InfoRow("采样倍率",t.optInt("sampleSize",1).toString())
-                                t.optJSONObject("timings")?.let { OcrTimingsCard(it) } }
+                    "特征" -> {
+                        QuietHeading("准备耗时")
+                        MetricRow("文字含义 · BGE",if(f.has("meaningMs")) elapsedLabel(f.optLong("meaningMs")) else "—")
+                        MetricRow("相近图片 · MobileNetV4",visual?.let { elapsedLabel(it.optLong("elapsedMs")) }.orEmpty())
+                        if(BuildConfig.HAS_DESCRIPTION) MetricRow("画面描述 · Chinese-CLIP",description?.let { elapsedLabel(it.optLong("elapsedMs")) }.orEmpty())
+                        Disclosure("文字含义",tag="detail_文字含义") {
+                            MetricRow("模型","BGE-small-zh-v1.5 · INT8")
+                            MetricRow("段落数",passages.length().toString())
+                            MetricRow("向量维度","512 / 段")
+                            MetricRow("最大输入","256 token / 段")
+                            InfoRow("索引版本",f.optString("meaningVersion","未记录"))
+                            for(i in 0 until passages.length()) {
+                                val passage=passages.getJSONObject(i)
+                                QuietHeading("段落 ${i+1}")
+                                SelectableValue(passage.optString("text").ifBlank { "旧记录未保存分段文字" })
+                            }
+                        }
+                        Disclosure("相近特征",tag="detail_相近特征") {
+                            FeatureCard("相近图片特征","MobileNetV4 Conv Small",visual,p.fingerprint,VisualFeatures.VERSION,1280)
+                            MetricRow("排序版本",VisualRanking.VERSION)
+                            MetricRow("指纹 / 颜色布局","63 位 pHash / 16 × 16 RGB")
+                            MetricRow("最多候选","40 张")
+                            visual?.let { MetricRow("pHash",it.optString("phash"));MetricRow("布局缓存","${it.optInt("layoutBytes")} B") }
+                        }
+                        if(BuildConfig.HAS_DESCRIPTION) Disclosure("画面特征",tag="detail_画面特征") {
+                            FeatureCard("画面描述特征","Chinese-CLIP B/16 · INT8",description,p.fingerprint,DescriptionFeatures.VERSION,512)
+                            MetricRow("图文向量","512 维")
+                            MetricRow("描述长度","最多 52 token")
                         }
                     }
-                    Disclosure("原始输出与历史") {
-                        SectionCard { Text("逐块原始文字");SelectableValue(ocr.optString("rawText",p.text)) }
-                        if(d.variants.isNotBlank()) SectionCard { Text("检索变体");Text("跨行候选，不代表原文。",style=MaterialTheme.typography.bodySmall);SelectableValue(d.variants) }
-                        if(d.previousText.isNotBlank()) SectionCard { Text("上次识别结果");SelectableValue(d.previousText) }
-                    }
-                    OutlinedButton(onClick={vm.rerun(listOf(p.id))},enabled=!state.workActive,modifier=Modifier.testTag("rerunOne")) { Text("重新识别这张图片的文字") }
-                }
-                "文字含义"->{
-                    SectionCard { Text("文字向量",style=MaterialTheme.typography.titleMedium)
-                        InfoRow("模型","BGE-small-zh-v1.5 · INT8");InfoRow("状态",if(p.semantic) "已准备" else if(p.state=="empty") "无文字，无需计算" else "尚未准备")
-                        InfoRow("段落数",passages.length().toString());InfoRow("向量维度","512 / 段");InfoRow("最大输入","256 token / 段")
-                        if(p.semantic) InfoRow("准备耗时",if(f.has("meaningMs")) "${f.optLong("meaningMs")} ms" else "旧记录未计时")
-                    InfoRow("索引版本",f.optString("meaningVersion","未记录")) }
-                    for(i in 0 until passages.length()) {
-                        val passage=passages.getJSONObject(i)
-                        SectionCard { Text("段落 ${i+1}",style=MaterialTheme.typography.titleSmall);SelectableValue(passage.optString("text").ifBlank { "旧记录未保存分段文字" });InfoRow("向量维度",passage.optInt("dimensions").toString()) }
+                    else -> {
+                        MatchCard(data.match,d.query)
+                        data.match.optJSONObject("search")?.let { trace ->
+                            Disclosure("本次检索的耗时与资源") { SearchTraceCard(trace) }
+                        }
                     }
                 }
-                "相近特征"->{
-                    FeatureCard("相近图片特征","MobileNetV4 Conv Small",visual,p.fingerprint,VisualFeatures.VERSION,1280)
-                    SectionCard { Text("比较方式",style=MaterialTheme.typography.titleMedium)
-                        InfoRow("模型输入","整图等比放入 224 × 224");InfoRow("视觉向量","1280 维 · L2 归一化")
-                        InfoRow("指纹","63 位 pHash");InfoRow("颜色布局","16 × 16 RGB")
-                        InfoRow("排序版本",VisualRanking.VERSION);InfoRow("普通排序","模型相似度 85% ＋ 颜色布局 15%")
-                        InfoRow("最多候选","40 张");InfoRow("时间与 OCR","不参与相近分数")
-                        visual?.let { InfoRow("pHash",it.optString("phash"));InfoRow("布局缓存","${it.optInt("layoutBytes")} B") } }
-                }
-                else->{
-                    FeatureCard("画面描述特征","Chinese-CLIP B/16 · INT8",description,p.fingerprint,DescriptionFeatures.VERSION,512)
-                    SectionCard { Text("图片与查询处理",style=MaterialTheme.typography.titleMedium)
-                        InfoRow("模型输入","整图等比放入 224 × 224，均值色留边")
-                        InfoRow("图像采样","最长边不超过 1536，双三次缩放")
-                        InfoRow("向量","图像与文字均为 512 维单位向量")
-                        InfoRow("描述长度","最多 52 token，超出截断")
-                        InfoRow("排序","同模型的图文向量点积，最多 100 项")
-                        Text("不生成图片标题，不依赖 OCR 文字。相似度是排序分数，不是相关概率。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-                }
+                Spacer(Modifier.height(10.dp))
             }
-            Spacer(Modifier.height(12.dp))
-        } }
+        }
     }
 }
 internal fun featureStatus(value:JSONObject?,fingerprint:String,version:String,dimensions:Int):String=when {
@@ -138,14 +184,11 @@ internal fun featureStatus(value:JSONObject?,fingerprint:String,version:String,d
     value.optInt("bytes")!=dimensions*4 ->"特征不完整"
     else ->"已准备"
 }
-@Composable
-private fun OcrTimingsCard(value:JSONObject, mergeMs:Long?=null) {
-    if(value.has("decodeImageMs")) InfoRow("图块解码","${value.optLong("decodeImageMs")} ms")
-    InfoRow("模型准备 / 像素转换","${value.optLong("loadMs")} / ${value.optLong("inputMs")} ms")
-    InfoRow("检测推理 / 提取文字框","${value.optLong("detectMs")} / ${value.optLong("boxesMs")} ms")
-    InfoRow("识别推理 / 转为文字","${value.optLong("recognizeMs")} / ${value.optLong("decodeTextMs")} ms")
-    InfoRow("文字框 / 识别调用","${value.optInt("boxCount")} / ${value.optInt("recognitionCalls")}")
-    if(mergeMs!=null) InfoRow("整理文字","$mergeMs ms")
+@Composable private fun OcrTimingsCard(value:JSONObject,mergeMs:Long?=null) {
+    val labels=listOf("detectMs" to "检测推理","boxesMs" to "提取文字框","recognizeMs" to "识别推理",
+        "decodeTextMs" to "转为文字","decodeImageMs" to "图块解码","inputMs" to "像素转换","loadMs" to "模型准备")
+    for((key,label) in labels) if(value.has(key)) MetricRow(label,elapsedLabel(value.optLong(key)))
+    if(mergeMs!=null) MetricRow("整理文字",elapsedLabel(mergeMs))
 }
 
 @Composable private fun FeatureCard(title:String,model:String,value:JSONObject?,fingerprint:String,version:String,dimensions:Int) {

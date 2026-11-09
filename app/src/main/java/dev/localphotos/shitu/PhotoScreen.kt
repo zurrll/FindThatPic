@@ -120,11 +120,11 @@ import dev.localphotos.shitu.data.*
                         }
                     }
                 }
-                item(key="galleryTitle",span={GridItemSpan(maxLineSpan)}) {
+                if(state.query.isNotBlank() || state.searching) item(key="galleryTitle",span={GridItemSpan(maxLineSpan)}) {
                     Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth().padding(horizontal=4.dp,vertical=6.dp)) {
-                        Text(if(state.query.isBlank()) "最近" else "${state.hits.size}${if(state.hits.size==100) "+" else ""} 个结果",
+                        if(state.query.isNotBlank()) Text("${state.hits.size}${if(state.hits.size==100) "+" else ""} 个结果",
                             style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.weight(1f))
-                        if(state.searching) CircularProgressIndicator(Modifier.size(14.dp),strokeWidth=2.dp)
+                        if(state.searching) { if(state.query.isBlank()) Spacer(Modifier.weight(1f));CircularProgressIndicator(Modifier.size(14.dp),strokeWidth=2.dp) }
                     }
                 }
                 if(state.message.isNotBlank()) item(span={GridItemSpan(maxLineSpan)}) { Text(state.message,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }

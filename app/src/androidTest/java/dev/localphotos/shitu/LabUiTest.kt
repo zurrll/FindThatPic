@@ -46,7 +46,11 @@ class LabUiTest {
                 scenario.onActivity { vm=ViewModelProvider(it)[PhotoViewModel::class.java];vm.options(SearchOptions(folders=setOf(folder)));vm.mode(SearchMode.TEXT) }
                 compose.waitUntil(15000) { !vm.state.value.searching && vm.state.value.hits.size==14 }
                 val target=vm.state.value.hits.first { it.photo.name.startsWith("猫咪") }.photo;val id=target.id
-                app.database.complete(id,"disco\nvery\n费用明细","[]",21,debug="{\"baseCount\":1,\"refinementCount\":0,\"tiles\":[{\"box\":[0,0,451,300],\"decodeMs\":2,\"ocrMs\":19,\"decodedWidth\":451,\"decodedHeight\":300}]}")
+                app.database.complete(id,"disco\nvery\n费用明细","[]",21,debug="""
+                    {"baseCount":1,"refinementCount":0,
+                     "timings":{"detectMs":8,"recognizeMs":11,"boxCount":1,"recognitionCalls":1},
+                     "tiles":[{"box":[0,0,451,300],"decodeMs":2,"ocrMs":19,"decodedWidth":451,"decodedHeight":300}]}
+                """.trimIndent())
                 app.database.saveVectors(id,listOf(FloatArray(512).apply { this[0]=1f }),passages=listOf("费用明细"))
                 app.database.saveVisual(target,VisualFeatures(FloatArray(1280).apply { this[0]=1f },0,ByteArray(768),451,300),7)
                 app.database.saveDescription(target,DescriptionFeatures(FloatArray(512).apply { this[0]=1f },451,300),32)
@@ -57,21 +61,26 @@ class LabUiTest {
                 app.database.complete(legacy,"旧文字记录","[{\"box\":[0,0,100,100]}]",2)
                 scenario.onActivity { vm.changed() };compose.waitForIdle()
                 shot("build12-home.png")
-                click("indexButton");compose.onNodeWithTag("prepareStart").assertIsDisplayed();compose.waitUntil(8000) { compose.onAllNodesWithTag("prepareRetry").fetchSemanticsNodes().isNotEmpty() };shot("build12-preparation.png");click("prepareRetry");click("sheetDone")
+                click("indexButton");compose.onNodeWithTag("prepareStart").assertIsDisplayed();click("preparationOptions");compose.waitUntil(8000) { compose.onAllNodesWithTag("prepareRetry").fetchSemanticsNodes().isNotEmpty() };shot("build12-preparation.png");click("prepareRetry");click("sheetDone")
                 compose.onNodeWithTag("searchField").performTextReplacement("discovery")
                 compose.waitUntil(15000) { !vm.state.value.searching && vm.state.value.hits.any { it.photo.id==id && it.matchDebug.isNotBlank() } }
                 click("photo_$id");compose.onNodeWithTag("photoViewer").assertIsDisplayed()
                 compose.onNodeWithTag("exportOne").assertDoesNotExist();compose.onNodeWithTag("reviewNote").assertDoesNotExist();compose.onNodeWithTag("rerunOne").assertDoesNotExist()
                 compose.onNodeWithTag("openInGallery").assertIsDisplayed()
                 shot("build12-viewer.png");compose.onNodeWithTag("photoViewer").performTouchInput { doubleClick() };shot("build12-viewer-zoom.png")
-                click("viewerMore");click("advancedInspector");compose.onNodeWithText("搜索信息").assertIsDisplayed()
+                click("viewerMore");click("advancedInspector")
+                compose.waitUntil(8000) { compose.onNodeWithText("搜索信息").isDisplayed() }
                 assertEquals("discovery",JSONObject(app.database.details(id)!!.matchDebug).getString("query"));shot("build12-technical.png")
-                click("detail_文字含义");compose.onNodeWithText("BGE-small-zh-v1.5 · INT8").assertExists()
-                click("detail_相近特征");compose.onNodeWithText("1280 维 · 5 KB").assertExists()
+                click("detail_特征");click("detail_文字含义");compose.onNodeWithText("BGE-small-zh-v1.5 · INT8").assertExists()
+                click("detail_文字含义");click("detail_相近特征");compose.onNodeWithText("1280 维 · 5 KB").assertExists()
                 if(BuildConfig.HAS_DESCRIPTION) {
-                    click("detail_画面特征");compose.onNodeWithText("Chinese-CLIP B/16 · INT8").assertExists()
+                    click("detail_相近特征");click("detail_画面特征");compose.onNodeWithText("Chinese-CLIP B/16 · INT8").assertExists()
                 }
-                click("detail_OCR");click("overlay_处理块");shot("build12-ocr-details.png")
+                click("detail_OCR")
+                compose.onNodeWithText("检测推理").assertIsDisplayed()
+                compose.onNodeWithText("识别推理").assertIsDisplayed()
+                compose.onNodeWithText("整理文字").assertDoesNotExist()
+                click("openOcrOverlay");click("overlay_处理块");shot("build12-ocr-details.png")
                 click("closeTechnical");click("closeInspector")
                 compose.onNodeWithTag("searchField").performTextReplacement("");compose.waitUntil(10000) { !vm.state.value.searching && vm.state.value.hits.size==14 }
                 click("selectMode");click("selectVisible")
@@ -79,7 +88,7 @@ class LabUiTest {
                 assertEquals("旧版说明需要保留",app.database.get(id)!!.reviewNote);assertEquals("旧版查询",app.database.details(id)!!.query)
                 click("finishSelection")
                 click("filterButton");compose.onNodeWithTag("originalOnly").assertDoesNotExist();shot("build12-filters.png");click("moreFilters");compose.onNodeWithTag("originalOnly").assertExists();click("sheetDone")
-                click("photo_$legacy");click("viewerMore");click("advancedInspector");click("detail_OCR");click("overlay_处理块")
+                click("photo_$legacy");click("viewerMore");click("advancedInspector");click("detail_OCR");click("openOcrOverlay");click("overlay_处理块")
                 compose.onNodeWithText("旧记录未保存统一坐标，不叠加识别框。").assertExists();click("closeTechnical");click("closeInspector")
             }
         } finally { uris.forEach { app.contentResolver.delete(it,null,null) };app.library.discover() }

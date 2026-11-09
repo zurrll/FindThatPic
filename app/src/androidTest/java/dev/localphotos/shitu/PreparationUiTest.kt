@@ -47,6 +47,7 @@ class PreparationUiTest {
                 lateinit var vm:PhotoViewModel
                 scenario.onActivity { vm=ViewModelProvider(it)[PhotoViewModel::class.java];vm.options(SearchOptions(folders=setOf(folder)));vm.kinds(PreparationKinds());vm.limit(100);vm.mode(SearchMode.TEXT);vm.query("") }
                 compose.waitUntil(15_000) { !vm.state.value.searching && vm.state.value.hits.size==20 }
+                compose.onNodeWithText("最近").assertDoesNotExist()
                 click("indexButton");click("prepareStart")
                 compose.waitUntil(20_000) { vm.state.value.workActive && app.progress.value.done>=2 }
                 click("preparePause");compose.waitUntil(15_000) { !vm.state.value.workActive && app.progress.value.paused }
@@ -100,9 +101,11 @@ class PreparationUiTest {
                 }
                 click("guideNext");compose.onNodeWithTag("gettingStarted").assertDoesNotExist()
                 click("librarySettings");click("settingsPrepare");click("sheetDone")
-                click("librarySettings");click("maintenance");click("performanceReport")
+                click("librarySettings");click("performanceReport")
                 compose.waitUntil(10_000) { compose.onAllNodesWithTag("closeReport").fetchSemanticsNodes().isNotEmpty() }
-                compose.onNodeWithText("导出报告").assertIsDisplayed()
+                compose.onNodeWithTag("exportPerformance").assertIsDisplayed()
+                compose.onNodeWithText("中位").assertIsDisplayed()
+                click("reportQueries");compose.onNodeWithText("最近查询").assertIsDisplayed()
                 click("closeReport");click("closeSettings")
                 scenario.onActivity { vm.query("");vm.kinds(PreparationKinds()) }
             }
