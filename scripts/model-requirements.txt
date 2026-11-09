@@ -1,0 +1,3 @@
+# Build-time graph extraction and OCR charset preparation.
+onnx==1.18.0
+PyYAML==6.0.3

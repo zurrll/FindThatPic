@@ -1,0 +1,27 @@
+{
+  "description": "Synthetic broad-topic and minority-word checks added after user feedback. These examples are validation only; production has no topic dictionary or query-specific rules.",
+  "documents": [
+    {"id":"exercise", "text":"周一慢跑三十分钟，周三做俯卧撑、深蹲和拉伸，周五篮球训练。每次先热身，结束后放松，按自己的状态调整强度。晚饭后完成作业。"},
+    {"id":"learning", "text":"新学期课程安排，学生每周完成阅读练习和数学题，老师批改后讲解错题，家长关注孩子的学习习惯。"},
+    {"id":"trip", "text":"周末出游行程：上午乘高铁去杭州，下午游西湖，晚上入住酒店。次日逛博物馆，返程前买好车票。"},
+    {"id":"cooking", "text":"把鸡蛋打散炒熟盛出，番茄切块下锅炒出汁，再倒回鸡蛋，加盐调味。"},
+    {"id":"code", "text":"用 Python 读取 JSON 文件，解析字典后遍历列表。出现异常时打印堆栈，检查字段名及数据类型。"},
+    {"id":"money", "text":"本月工资到账八千元，支出包括房租、水电、买菜及交通费用。月底核对收支，留出应急储蓄。"}
+  ],
+  "queries": [
+    {"query":"体育", "relevant":["exercise"], "split":"topic_validation"},
+    {"query":"教育", "relevant":["learning"], "split":"topic_validation"},
+    {"query":"旅游", "relevant":["trip"], "split":"topic_validation"},
+    {"query":"烹饪", "relevant":["cooking"], "split":"topic_validation"},
+    {"query":"编程", "relevant":["code"], "split":"topic_validation"},
+    {"query":"财务", "relevant":["money"], "split":"topic_validation"},
+    {"query":"作业", "relevant":["exercise"], "split":"minority_word"},
+    {"query":"数学题", "relevant":["learning"], "split":"minority_word"},
+    {"query":"车票", "relevant":["trip"], "split":"minority_word"},
+    {"query":"盐", "relevant":["cooking"], "split":"minority_word"},
+    {"query":"类型", "relevant":["code"], "split":"minority_word"},
+    {"query":"应急", "relevant":["money"], "split":"minority_word"},
+    {"query":"火星基地生命维持系统维修手册", "relevant":[], "split":"no_answer"},
+    {"query":"潜水艇核反应堆设计图", "relevant":[], "split":"no_answer"}
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "model": "timm/mobilenetv4_conv_small.e2400_r224_in1k",
+  "upstream_revision": "331fb803779522b685cf942e15f914fb6741c1eb",
+  "onnx_repository": "onnx-community/mobilenetv4_conv_small.e2400_r224_in1k",
+  "revision": "3ba07f12712fa58fd6b3d661f9909c9e332c5005",
+  "license": "Apache-2.0",
+  "url": "https://huggingface.co/onnx-community/mobilenetv4_conv_small.e2400_r224_in1k/resolve/3ba07f12712fa58fd6b3d661f9909c9e332c5005/onnx/model.onnx",
+  "sha256": "ca5b8dbf490f54e83c5d72f787821565447ea94347935f6b834cf0a4af0e8d37",
+  "name": "mobilenetv4-small-features.onnx",
+  "output": "/flatten/Flatten_output_0",
+  "dimensions": 1280,
+  "modification": "Remove final ImageNet classifier; expose flattened pre-classifier embedding. No retraining or weight quantization.",
+  "preprocessing": "sRGB, whole image aspect-fit 224x224 with mean RGB padding, bilinear interpolation; RGB/255, mean [0.485,0.456,0.406], std [0.229,0.224,0.225]. Deliberately replaces upstream 256 resize + 224 center crop to retain screenshot edges. L2 normalize output.",
+  "asset_sha256": "588380afbe390aaaa764b9fe36458520b54b693c72a2b6d6d657b21b381cc671"
+}

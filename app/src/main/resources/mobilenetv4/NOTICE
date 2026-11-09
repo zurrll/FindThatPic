@@ -1,0 +1,9 @@
+MobileNetV4 Conv Small (ImageNet-1k), trained by Ross Wightman / timm.
+Source: https://huggingface.co/timm/mobilenetv4_conv_small.e2400_r224_in1k
+Source revision: 331fb803779522b685cf942e15f914fb6741c1eb
+ONNX conversion: onnx-community/mobilenetv4_conv_small.e2400_r224_in1k
+Conversion revision: 3ba07f12712fa58fd6b3d661f9909c9e332c5005
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+Shitu modification: remove final classifier and expose the pre-classifier
+1280-dimensional embedding; no retraining. Whole-image aspect-fit preprocessing
+replaces default center-crop. Reproduction: visual-model.lock.json.

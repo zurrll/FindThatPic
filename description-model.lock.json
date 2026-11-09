@@ -1,0 +1,61 @@
+{
+  "upstream": "OFA-Sys/chinese-clip-vit-base-patch16",
+  "upstreamRevision": "36e679e65c2a2fead755ae21162091293ad37834",
+  "license": "MIT in upstream code repository; weight model card does not declare a license",
+  "repository": "Xenova/chinese-clip-vit-base-patch16",
+  "revision": "f26904860903e70e050b8f48255e5f48401816e9",
+  "files": {
+    "onnx/model_quantized.onnx": {
+      "sha256": "a2c2849329eafb24100acec5a9421a39f8cb445296444c5c98855b69e5e7a751",
+      "bytes": 190842404
+    },
+    "config.json": {
+      "sha256": "19447ad8c20d274f0644a6663af56286be98bd2d0e5f9472fcb318e04fcd6961",
+      "bytes": 844
+    },
+    "preprocessor_config.json": {
+      "sha256": "61a78fdd2c7ac17b54b6190c0f4cb23423192c535003d52528d01e318a47608b",
+      "bytes": 546
+    },
+    "tokenizer.json": {
+      "sha256": "7dfbf1966ebf99d471c3796e9b457329d2b2182b817e144f1e904b957745c839",
+      "bytes": 439124
+    },
+    "tokenizer_config.json": {
+      "sha256": "38fbc894183595cc1168e36150251b2fb658197b3a49f6908cce88ae22acd52a",
+      "bytes": 1315
+    },
+    "special_tokens_map.json": {
+      "sha256": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3",
+      "bytes": 125
+    },
+    "vocab.txt": {
+      "sha256": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c",
+      "bytes": 109540
+    }
+  },
+  "name": "Chinese-CLIP B/16（中文）",
+  "maxLength": 52,
+  "padToken": "[PAD]",
+  "dimensions": 512,
+  "visionFile": "onnx/vision-q8.onnx",
+  "textFile": "onnx/text-q8.onnx",
+  "visionOutput": "image_embeds",
+  "textOutput": "text_embeds",
+  "licenseSource": "https://github.com/OFA-Sys/Chinese-CLIP/blob/master/MIT-LICENSE.txt",
+  "derivation": {
+    "from": "onnx/model_quantized.onnx",
+    "tool": "onnx==1.18.0",
+    "method": "Extract vision pixel_values -> image_embeds, text input_ids+attention_mask -> text_embeds; no weight changes"
+  },
+  "derivedFiles": {
+    "onnx/vision-q8.onnx": {
+      "sha256": "e1208d2e5131ff2a6df1ff62607a501ffa441295ff4687abb27cc1b4db2facde",
+      "bytes": 87539163
+    },
+    "onnx/text-q8.onnx": {
+      "sha256": "5daf248eb5e5c980b2c7a33c5976c6d3c6f58fd094f017512da41ea7582fe75b",
+      "bytes": 103419927
+    }
+  }
+}

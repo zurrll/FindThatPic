@@ -1,0 +1,8 @@
+Small test fixtures derived from scikit-image v0.25.2, resized using Pillow bilinear:
+https://github.com/scikit-image/scikit-image/tree/v0.25.2/skimage/data
+astronaut.png: NASA photograph of Eileen Collins; public domain.
+chelsea.png: Chelsea the cat, Stefan van der Walt; CC0.
+Source descriptions: https://scikit-image.org/docs/stable/api/skimage.data.html
+reference.json: normalized ONNX Runtime 1.22.1 output for astronaut.png using
+visual-model.lock.json; generated reference, not a retrieval-quality benchmark.
+Fixtures are in the test APK only, never in the application APK.
