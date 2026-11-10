@@ -33,6 +33,56 @@ def prepare_ocr_charset(spec, destination):
     print(f"Prepared and verified {target.name}")
 
 
+def compact_ocr_recognizer(source, target):
+    import onnx
+    from onnx import TensorProto, helper
+
+    model = onnx.load(source)
+    graph = model.graph
+    probabilities = graph.output[0]
+    assert len(graph.output) == 1 and probabilities.type.tensor_type.shape.dim[-1].dim_value == 6906
+    graph.initializer.append(helper.make_tensor("ocr_top_count", TensorProto.INT64, [1], [1]))
+    graph.node.append(helper.make_node("TopK", [probabilities.name, "ocr_top_count"],
+        ["top_score", "top_index"], axis=2, largest=1, sorted=0))
+    for source_name, name, dtype in (
+        ("top_index", "character_ids", TensorProto.INT64),
+        ("top_score", "character_scores", TensorProto.FLOAT),
+    ):
+        graph.node.append(helper.make_node("Squeeze", [source_name], [name], axes=[2]))
+        output = graph.output.add()
+        output.CopyFrom(probabilities)
+        output.name = name
+        output.type.tensor_type.elem_type = dtype
+        del output.type.tensor_type.shape.dim[2:]
+    del graph.output[0]
+    model.doc_string = "FindThatPic returns top-1 character IDs and original softmax probabilities; PaddleOCR weights unchanged."
+    onnx.checker.check_model(model)
+    onnx.save(model, target)
+
+
+def prepare_ocr_recognizer(spec, destination):
+    target = destination / spec["name"]
+    existing = hashlib.sha256(target.read_bytes()).hexdigest() if target.is_file() else None
+    if existing == spec["sha256"]:
+        print(f"Verified {target.name}")
+        return
+    source = spec["source"]
+    with tempfile.TemporaryDirectory(dir=destination) as folder:
+        original = target
+        if existing != source["sha256"]:
+            original = Path(folder) / "original.onnx"
+            with urllib.request.urlopen(source["url"], timeout=120) as response, original.open("wb") as out:
+                shutil.copyfileobj(response, out)
+            if hashlib.sha256(original.read_bytes()).hexdigest() != source["sha256"]:
+                raise SystemExit("OCR recognizer source checksum mismatch")
+        derived = Path(folder) / target.name
+        compact_ocr_recognizer(original, derived)
+        if hashlib.sha256(derived.read_bytes()).hexdigest() != spec["sha256"]:
+            raise SystemExit("OCR recognizer derivation mismatch; use pinned onnx version")
+        derived.replace(target)
+    print(f"Prepared and verified {target.name}")
+
+
 def fetch_description(destination, source):
     spec = json.loads((ROOT / "description-model.lock.json").read_text())
     def matches(path, item):
@@ -83,6 +133,7 @@ def main():
         print(f"Downloaded and verified {target.name}")
 
     prepare_ocr_charset(manifest["ocr_charset"], destination)
+    prepare_ocr_recognizer(manifest["ocr_recognizer"], destination)
 
     # Keep only the pre-classifier feature output, using a pinned source graph.
     visual = json.loads((ROOT / "visual-model.lock.json").read_text())

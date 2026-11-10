@@ -13,6 +13,7 @@ import dev.localphotos.shitu.core.PaddleOcr
 import dev.localphotos.shitu.core.PaddleTimings
 import dev.localphotos.shitu.core.TextTools
 import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,6 +35,13 @@ class OfflineModelTest {
             assertEquals(serial.map { it.text to it.box },batched.map { it.text to it.box })
             assertTrue(batched.zip(serial).all { (a,b) -> kotlin.math.abs(a.confidence-b.confidence)<0.0001f })
             assertTrue(batchTimes.recognitionCalls<serialTimes.recognitionCalls)
+            val batches=batchTimes.json(includeBatches=true).getJSONArray("recognitionBatches")
+            assertEquals(batchTimes.recognitionCalls,batches.length())
+            assertEquals(6,(0 until batches.length()).sumOf { batches.getJSONObject(it).getInt("lines") })
+            assertTrue((0 until batches.length()).all {
+                val batch=batches.getJSONObject(it)
+                batch.getInt("inputWidth")>0 && batch.getInt("steps")>0
+            })
         } finally { image.recycle() }
     }
     @Test fun chineseOcrReadsBothEndsOfLongScreenshotOffline()=runBlocking {
@@ -47,7 +55,9 @@ class OfflineModelTest {
         file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) };image.recycle()
         try {
             OcrEngine(context).use { ocr ->
-                val text=ocr.recognize(Uri.fromFile(file)).text
+                val result=ocr.recognize(Uri.fromFile(file))
+                val text=result.text
+                assertEquals(4,JSONObject(result.debug).getInt("recognitionThreads"))
                 assertTrue(text,text.contains("装修"))
                 assertTrue(text,text.contains("武康路"))
                 assertTrue(text,text.contains("AB-123"))

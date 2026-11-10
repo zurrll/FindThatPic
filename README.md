@@ -4,7 +4,7 @@
 
 拾图完全离线运行，应用无联网权限，原图只读。
 
-[下载 0.1.1](https://github.com/zurrll/FindThatPic/releases/tag/v0.1.1) · Android 10+ · ARM64 · 安装包约 151 MiB
+[下载 0.1.2](https://github.com/zurrll/FindThatPic/releases/tag/v0.1.2) · Android 10+ · ARM64 · 安装包约 151 MiB
 
 ## 你想找哪一张？
 
@@ -34,7 +34,7 @@
 
 ```sh
 python3 -m pip install -r scripts/model-requirements.txt
-unzip -j FindThatPic-0.1.1-arm64.apk 'assets/models/cnclip-*' -d rn50-assets
+unzip -j FindThatPic-0.1.2-arm64.apk 'assets/models/cnclip-*' -d rn50-assets
 python3 scripts/fetch_models.py --description-assets rn50-assets
 ./gradlew :app:assembleRelease
 ```

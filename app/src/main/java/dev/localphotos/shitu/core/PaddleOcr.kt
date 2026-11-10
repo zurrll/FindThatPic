@@ -19,6 +19,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.nio.LongBuffer
 import kotlin.math.ceil
 import kotlin.math.hypot
 import kotlin.math.roundToInt
@@ -28,6 +29,8 @@ internal class OcrModelUnavailable(cause: Exception) : IllegalStateException("OC
 internal data class PaddleLine(val text: String, val box: OcrBox, val confidence: Float)
 
 internal class PaddleTimings {
+    private data class RecognitionBatch(val lines: Int, val inputWidth: Int, val steps: Int)
+    private val batches = mutableListOf<RecognitionBatch>()
     var load = 0L
     var input = 0L
     var detect = 0L
@@ -36,6 +39,12 @@ internal class PaddleTimings {
     var decode = 0L
     var boxCount = 0
     var recognitionCalls = 0
+        private set
+
+    fun recordBatch(lines: Int, inputWidth: Int, steps: Int) {
+        recognitionCalls++
+        if (batches.size < 64) batches += RecognitionBatch(lines, inputWidth, steps)
+    }
 
     fun add(other: PaddleTimings) {
         load += other.load
@@ -46,13 +55,20 @@ internal class PaddleTimings {
         decode += other.decode
         boxCount += other.boxCount
         recognitionCalls += other.recognitionCalls
+        batches += other.batches.take(64 - batches.size)
     }
 
-    fun json() = JSONObject()
+    fun json(includeBatches: Boolean = false) = JSONObject()
         .put("loadMs", load / 1_000_000).put("inputMs", input / 1_000_000)
         .put("detectMs", detect / 1_000_000).put("boxesMs", boxes / 1_000_000)
         .put("recognizeMs", recognize / 1_000_000).put("decodeTextMs", decode / 1_000_000)
         .put("boxCount", boxCount).put("recognitionCalls", recognitionCalls)
+        .apply {
+            if (includeBatches) put("recognitionBatches", JSONArray().apply {
+                for (batch in batches) put(JSONObject()
+                    .put("lines", batch.lines).put("inputWidth", batch.inputWidth).put("steps", batch.steps))
+            })
+        }
 }
 
 internal class PaddleOcr(private val context: Context, private val maxBatch: Int = 4) : AutoCloseable {
@@ -76,7 +92,7 @@ internal class PaddleOcr(private val context: Context, private val maxBatch: Int
         List(json.length(), json::getString)
     }
 
-    private fun load(asset: String, revision: String): OrtSession {
+    private fun load(asset: String, revision: String, threads: Int): OrtSession {
         val directory = File(context.noBackupFilesDir, "models").apply { mkdirs() }
         val target = File(directory, "$revision-$asset")
         if (!target.isFile) {
@@ -89,7 +105,7 @@ internal class PaddleOcr(private val context: Context, private val maxBatch: Int
             }
         }
         return OrtSession.SessionOptions().use {
-            it.setIntraOpNumThreads(2)
+            it.setIntraOpNumThreads(threads)
             it.setInterOpNumThreads(1)
             it.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
             env.createSession(target.path, it)
@@ -99,8 +115,8 @@ internal class PaddleOcr(private val context: Context, private val maxBatch: Int
     private fun prepare() {
         try {
             check(alphabet.size == 6906)
-            if (detector == null) detector = load("ppocrv6-tiny-det.onnx", "193bab7a")
-            if (recognizer == null) recognizer = load("ppocrv6-tiny-rec.onnx", "9ef676d6")
+            if (detector == null) detector = load("ppocrv6-tiny-det.onnx", "193bab7a", 2)
+            if (recognizer == null) recognizer = load("ppocrv6-tiny-rec.onnx", "6c30f51b", OcrEngine.RECOGNITION_THREADS)
         } catch (e: Exception) {
             throw OcrModelUnavailable(e)
         }
@@ -130,9 +146,10 @@ internal class PaddleOcr(private val context: Context, private val maxBatch: Int
         }
         timings.input += SystemClock.elapsedRealtimeNanos() - tick
         tick = SystemClock.elapsedRealtimeNanos()
-        val boxes = infer(checkNotNull(detector), input, 1, width, height) { output ->
+        val boxes = infer(checkNotNull(detector), input, 1, width, height) { result ->
             timings.detect += SystemClock.elapsedRealtimeNanos() - tick
             val start = SystemClock.elapsedRealtimeNanos()
+            val output = result[0] as OnnxTensor
             check(output.info.shape.contentEquals(longArrayOf(1, 1, height.toLong(), width.toLong())))
             val probabilities = FloatArray(width * height).also { output.floatBuffer.get(it) }
             PaddleBoxes.detect(probabilities, width, height, scope::ensureActive).also {
@@ -198,15 +215,19 @@ internal class PaddleOcr(private val context: Context, private val maxBatch: Int
         }
         timings.input += SystemClock.elapsedRealtimeNanos() - tick
         tick = SystemClock.elapsedRealtimeNanos()
-        timings.recognitionCalls++
-        infer(checkNotNull(recognizer), input, batch.size, stride, 48) { output ->
+        infer(checkNotNull(recognizer), input, batch.size, stride, 48) { result ->
             timings.recognize += SystemClock.elapsedRealtimeNanos() - tick
             val start = SystemClock.elapsedRealtimeNanos()
-            val shape = output.info.shape
-            check(shape.size == 3 && shape[0] == batch.size.toLong() && shape[2] == alphabet.size.toLong())
-            val scores = output.floatBuffer
+            val characters = result[0] as OnnxTensor
+            val probabilities = result[1] as OnnxTensor
+            val shape = characters.info.shape
+            check(shape.size == 2 && shape[0] == batch.size.toLong() && probabilities.info.shape.contentEquals(shape))
+            val steps = shape[1].toInt()
+            val ids = characters.longBuffer
+            val scores = probabilities.floatBuffer
+            timings.recordBatch(batch.size, stride, steps)
             for (spec in batch) {
-                val (text, confidence) = decode(scores, shape[1].toInt())
+                val (text, confidence) = decode(ids, scores, steps)
                 if (text.isBlank() || confidence < 0.30f) continue
                 val box = spec.box
                 val xs = box.filterIndexed { i, _ -> i % 2 == 0 }
@@ -217,21 +238,14 @@ internal class PaddleOcr(private val context: Context, private val maxBatch: Int
         }
     }
 
-    private fun decode(scores: FloatBuffer, steps: Int): Pair<String, Float> {
+    private fun decode(ids: LongBuffer, scores: FloatBuffer, steps: Int): Pair<String, Float> {
         val text = StringBuilder()
         var previous = -1
         var sum = 0f
         var count = 0
         repeat(steps) {
-            var best = -Float.MAX_VALUE
-            var index = 0
-            for (c in alphabet.indices) {
-                val value = scores.get()
-                if (value > best) {
-                    index = c
-                    best = value
-                }
-            }
+            val index = ids.get().toInt()
+            val best = scores.get()
             if (index != 0 && index != previous) {
                 text.append(alphabet[index])
                 sum += best
@@ -271,9 +285,9 @@ internal class PaddleOcr(private val context: Context, private val maxBatch: Int
     }
 
     private fun <T> infer(session: OrtSession, input: FloatBuffer, batch: Int, width: Int, height: Int,
-        read: (OnnxTensor) -> T): T =
+        read: (OrtSession.Result) -> T): T =
         OnnxTensor.createTensor(env, input, longArrayOf(batch.toLong(), 3, height.toLong(), width.toLong())).use { tensor ->
-            session.run(mapOf("x" to tensor)).use { read(it[0] as OnnxTensor) }
+            session.run(mapOf("x" to tensor)).use(read)
         }
 
     override fun close() {

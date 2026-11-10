@@ -3,3 +3,6 @@ The model weights and matching recognition vocabulary are from the following
 Apache-2.0 releases. Pinned revisions and checksums are in models.lock.json.
 https://huggingface.co/PaddlePaddle/PP-OCRv6_tiny_det_onnx
 https://huggingface.co/PaddlePaddle/PP-OCRv6_tiny_rec_onnx
+
+FindThatPic adds top-1 selection to the recognizer output to return
+character IDs and their original probabilities. The weights are unchanged.

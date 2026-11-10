@@ -48,7 +48,8 @@ class LabUiTest {
                 val target=vm.state.value.hits.first { it.photo.name.startsWith("猫咪") }.photo;val id=target.id
                 app.database.complete(id,"disco\nvery\n费用明细","[]",21,debug="""
                     {"baseCount":1,"refinementCount":0,
-                     "timings":{"detectMs":8,"recognizeMs":11,"boxCount":1,"recognitionCalls":1},
+                     "timings":{"detectMs":8,"recognizeMs":11,"boxCount":1,"recognitionCalls":1,
+                                "recognitionBatches":[{"lines":1,"inputWidth":320,"steps":40}]},
                      "tiles":[{"box":[0,0,451,300],"decodeMs":2,"ocrMs":19,"decodedWidth":451,"decodedHeight":300}]}
                 """.trimIndent())
                 app.database.saveVectors(id,listOf(FloatArray(512).apply { this[0]=1f }),passages=listOf("费用明细"))
@@ -80,6 +81,9 @@ class LabUiTest {
                 compose.onNodeWithText("检测推理").assertIsDisplayed()
                 compose.onNodeWithText("识别推理").assertIsDisplayed()
                 compose.onNodeWithText("整理文字").assertDoesNotExist()
+                click("ocrBatches")
+                compose.onNodeWithText("320 px · 40 步").assertExists()
+                click("ocrBatches")
                 click("openOcrOverlay");click("overlay_处理块");shot("build12-ocr-details.png")
                 click("closeTechnical");click("closeInspector")
                 compose.onNodeWithTag("searchField").performTextReplacement("");compose.waitUntil(10000) { !vm.state.value.searching && vm.state.value.hits.size==14 }

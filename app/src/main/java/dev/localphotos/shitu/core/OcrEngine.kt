@@ -19,7 +19,8 @@ data class OcrOutput(val text:String,val blocks:String,val variants:String="",va
 class OcrEngine(private val context:Context):AutoCloseable {
     private val recognizer=PaddleOcr(context)
     companion object {
-        const val VERSION="ppocrv6-tiny:adaptive-v4:det960-v1"
+        const val VERSION="ppocrv6-tiny:adaptive-v4:det960-top1-v1"
+        internal const val RECOGNITION_THREADS=4
         fun engineLabel(version:String)=when {
             version.startsWith("ppocrv6-tiny:")->"PP-OCRv6 tiny"
             version.startsWith("mlkit-cn16.0.1:")->"ML Kit Chinese 16.0.1"
@@ -43,6 +44,7 @@ class OcrEngine(private val context:Context):AutoCloseable {
             val decoder=try { BitmapRegionDecoder.newInstance(fd.fileDescriptor,false) } catch(_:Exception) { null }
             val lines=mutableListOf<OcrLine>();val tiles=JSONArray();var refinementPlanMs=0L
             val timings=PaddleTimings();var totalDecodeMs=0L
+            var mergedBase:List<OcrLine>?=null
             suspend fun tile(spec:OcrRegion) {
                 currentCoroutineContext().ensureActive()
                 val region=Rect(spec.left,spec.top,spec.right,spec.bottom)
@@ -73,26 +75,28 @@ class OcrEngine(private val context:Context):AutoCloseable {
                 } else {
                     for(region in plan) tile(region)
                     val planStart=SystemClock.elapsedRealtime()
-                    val refinements=OcrPlan.refinements(OcrLayout.merge(lines),plan,width,height,orientation)
+                    val baseLines=OcrLayout.merge(lines)
+                    val refinements=OcrPlan.refinements(baseLines,plan,width,height,orientation)
                     refinementPlanMs=SystemClock.elapsedRealtime()-planStart
+                    if(refinements.isEmpty()) mergedBase=baseLines
                     for(region in refinements) tile(region)
                 }
             } finally { decoder?.recycle() }
             currentCoroutineContext().ensureActive()
             val mergeStart=SystemClock.elapsedRealtime()
-            val merged=OcrLayout.merge(lines)
+            val merged=mergedBase?:OcrLayout.merge(lines)
             val text=merged.joinToString("\n") { it.text }
             val blocks=JSONArray().apply { merged.forEach { put(lineJson(it)) } }
             val raw=lines.joinToString("\n") { it.text }
             val variants=OcrLayout.searchVariants(merged)
-            val debug=JSONObject().put("version",VERSION).put("mode","adaptive").put("width",width).put("height",height)
+            val debug=JSONObject().put("version",VERSION).put("mode","adaptive").put("recognitionThreads",RECOGNITION_THREADS).put("width",width).put("height",height)
                 .put("uprightWidth",if(orientation in 5..8) height else width).put("uprightHeight",if(orientation in 5..8) width else height)
                 .put("orientation",orientation).put("strategy",if(plan.singleOrNull()?.kind=="overview") "whole-sampled" else "tiles")
                 .put("baseCount",plan.size).put("refinementCount",tiles.length()-plan.size).put("refinementBudget",OcrPlan.MAX_REFINEMENTS)
                 .put("tileSize",1800).put("overlap",240)
                 .put("tiles",tiles).put("rawText",raw).put("rawLines",JSONArray().apply { lines.forEach { put(lineJson(it)) } })
                 .put("rawLineCount",lines.size).put("mergedLineCount",merged.size).put("mergeMs",refinementPlanMs+SystemClock.elapsedRealtime()-mergeStart)
-                .put("timings",timings.json().put("decodeImageMs",totalDecodeMs))
+                .put("timings",timings.json(includeBatches=true).put("decodeImageMs",totalDecodeMs))
                 .put("totalMs",SystemClock.elapsedRealtime()-started)
                 .put("notes",JSONArray(listOf("跨行连接仅作为低权重检索候选，不修改原文", "阅读顺序为几何近似，多栏和复杂表格仍可能错序", "动图不选最佳帧，仅静态解码", "普通大图可能采样；长宽比至少 3 的长图超过 1800 像素后按原分辨率分段")))
             return OcrOutput(text,blocks.toString(),variants,debug.toString(),VERSION)

@@ -100,12 +100,23 @@ import org.json.JSONObject
                             if(ocr.optInt("refinementCount")>0) add("补看 ${ocr.optInt("refinementCount")} 次")
                             if(timings?.has("boxCount")==true) add("${timings.optInt("boxCount")} 个文字框")
                             if(timings?.has("recognitionCalls")==true) add("${timings.optInt("recognitionCalls")} 次识别")
+                            if(ocr.has("recognitionThreads")) add("${ocr.optInt("recognitionThreads")} 线程识别")
                         }
                         if(stats.isNotEmpty()) Text(stats.joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         HorizontalDivider()
                         if(timings!=null) {
                             QuietHeading("各步骤耗时")
                             OcrTimingsCard(timings,if(ocr.has("mergeMs")) ocr.optLong("mergeMs") else null)
+                            val batches=timings.optJSONArray("recognitionBatches")
+                            if(batches!=null && batches.length()>0) Disclosure("识别批次",tag="ocrBatches") {
+                                for(i in 0 until batches.length()) {
+                                    val batch=batches.optJSONObject(i)?:continue
+                                    MetricRow("第 ${i+1} 批 · ${batch.optInt("lines")} 行",
+                                        "${batch.optInt("inputWidth")} px · ${batch.optInt("steps")} 步")
+                                }
+                                val remaining=timings.optInt("recognitionCalls")-batches.length()
+                                if(remaining>0) Text("另有 $remaining 批",style=MaterialTheme.typography.bodySmall)
+                            }
                         } else Text("这张图暂无分段计时。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         Disclosure(if(count==0) "逐块耗时与输入尺寸" else "逐块耗时 · $count 块") {
                             if(count==0) Text("暂无分块记录")
